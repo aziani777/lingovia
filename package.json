@@ -1,0 +1,11 @@
+{
+  "name": "lingovia",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Learn a language by talking with an animated tutor. 90 day program.",
+  "dependencies": {
+    "@anthropic-ai/sdk": "latest",
+    "zod": "latest"
+  }
+}
