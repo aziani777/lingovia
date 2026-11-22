@@ -76,7 +76,8 @@ h1,h2,h3{margin:0;line-height:1.15;letter-spacing:-.01em}
 .stage video,.stage img,.stage canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 22%}
 .stage #face{opacity:0;transition:opacity .18s}
 .stage.talking #face{opacity:1}
-.stage::after{content:"";position:absolute;inset:auto 0 0 0;height:120px;background:linear-gradient(transparent,rgba(0,0,0,.65));pointer-events:none}
+.stage video,.stage>img{transform:scale(1.035)}
+.stage::after{z-index:1;content:"";position:absolute;inset:auto 0 0 0;height:120px;background:linear-gradient(transparent,rgba(0,0,0,.65));pointer-events:none}
 .stage .hud{position:absolute;left:0;right:0;top:0;padding:calc(10px + var(--safe-t)) 12px 0;display:flex;gap:8px;align-items:center;z-index:2}
 .pill{background:rgba(0,0,0,.45);color:#fff;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:99px;padding:8px 12px;font-size:13px;font-weight:700;min-height:36px;display:inline-flex;align-items:center;gap:6px}
 .stage .who{position:absolute;left:14px;bottom:26px;z-index:2;color:#fff}
@@ -324,7 +325,7 @@ function unlockAudio() {
   try { player.src = SILENCE; player.play().catch(() => {}); } catch {}
   try {
     const AC = window.AudioContext || window.webkitAudioContext;
-    if (AC && !actx) { actx = new AC(); analyser = actx.createAnalyser(); analyser.fftSize = 512; abuf = new Uint8Array(analyser.fftSize);
+    if (AC && !actx) { actx = new AC(); analyser = actx.createAnalyser(); analyser.fftSize = 512; analyser.smoothingTimeConstant = 0.35; abuf = new Uint8Array(analyser.fftSize);
       actx.createMediaElementSource(player).connect(analyser); analyser.connect(actx.destination); }
     if (actx && actx.state !== 'running') actx.resume().catch(() => {});
   } catch {}
@@ -379,48 +380,76 @@ async function speak(items, slow) {
   setTalking(false);
 }
 
-/* ---------- face: mouth driven by the voice ---------- */
+/* ---------- face: mouth shapes driven by the voice ---------- */
 const face = (() => {
-  const M = { x: 215, y: 273, w: 235, h: 145, n: 8 }, B = { x: 221, y: 159, w: 211, h: 79 };
+  // sprite sheet: 3 rows (rounded, neutral, wide lips) x 6 columns (closed to open)
+  const M = { x: 215, y: 273, w: 235, h: 145, n: 6, rows: 3 }, B = { x: 221, y: 159, w: 211, h: 79 };
   const cv = $('#face'), g = cv.getContext('2d');
+  const tmp = document.createElement('canvas'); tmp.width = M.w; tmp.height = M.h; const tg = tmp.getContext('2d');
   const img = src => { const i = new Image(); i.src = src; return i; };
   const base = img('/assets/base.jpg'), mouth = img('/assets/mouth.jpg'), blink = img('/assets/blink.jpg');
-  let raf = 0, open = 0, peak = 0.05, nextBlink = 0, blinkAt = -1;
+  let raf = 0, open = 0, prev = 0, peak = 0.05, shape = 1, shapeTo = 1, cLo = 1e9, cHi = 0, wasOpen = false;
+  let nextBlink = 0, blinkAt = -1, live = 0, fbuf = null;
   const api = { fake: false, start, stop };
-  function level(t) {
-    let v = 0;
+
+  // returns [loudness 0..1+, brightness of the sound or -1 when unknown]
+  function listen(t) {
+    let f = null, v = 0;
     if (L && L.conv) {
+      try { f = L.conv.getOutputByteFrequencyData(); } catch {}
       try { v = L.conv.getOutputVolume() || 0; } catch {}
-      if (!v) { try { const f = L.conv.getOutputByteFrequencyData(); if (f && f.length) { let s = 0; const n = Math.min(f.length, 48); for (let i = 2; i < n; i++) s += f[i]; v = s / (n - 2) / 255; } } catch {} }
     } else if (api.fake) {
-      v = 0.5 + 0.5 * Math.sin(t / 55) * Math.sin(t / 131) ; v = v < 0.42 ? 0 : v; // no audio access: plausible syllables
+      v = 0.5 + 0.5 * Math.sin(t / 55) * Math.sin(t / 131); return [v < 0.42 ? 0 : v, -1];
     } else if (analyser && !player.paused) {
-      analyser.getByteTimeDomainData(abuf);
-      let s = 0; for (let i = 0; i < abuf.length; i++) { const d = (abuf[i] - 128) / 128; s += d * d; }
-      v = Math.sqrt(s / abuf.length) * 3;
+      if (!fbuf) fbuf = new Uint8Array(analyser.frequencyBinCount);
+      analyser.getByteFrequencyData(fbuf); f = fbuf;
     }
-    return v;
+    if (!f || !f.length) return [v, -1];
+    let e = 0, c = 0; const n = Math.min(f.length, 96);
+    for (let i = 1; i < n; i++) { const a = f[i] * f[i]; e += a; c += a * i; }
+    const loud = Math.sqrt(e / (n - 1)) / 255;
+    return [v || loud * 1.6, e > 0 ? c / e : -1];
+  }
+  function row(r, k0, k1, a, ctx, dx, dy) {
+    ctx.globalAlpha = 1; ctx.drawImage(mouth, k0 * M.w, r * M.h, M.w, M.h, dx, dy, M.w, M.h);
+    if (a > 0.02) { ctx.globalAlpha = a; ctx.drawImage(mouth, k1 * M.w, r * M.h, M.w, M.h, dx, dy, M.w, M.h); ctx.globalAlpha = 1; }
   }
   function frame(t) {
     raf = requestAnimationFrame(frame);
     if (!base.complete || !mouth.complete) return;
-    const v = level(t);
-    peak = Math.max(v, peak * 0.9985, 0.03);              // slow auto-gain
-    const target = Math.min(1, Math.max(0, (v / peak - 0.12) / 0.7));
-    open += (target - open) * (target > open ? 0.55 : 0.28); // quick to open, softer to close
-    g.drawImage(base, 0, 0, 640, 640);
-    const f = Math.pow(open, 0.8) * (M.n - 2) * 0.85, lo = Math.floor(f), a = f - lo;
-    const idx = k => k <= 0 ? 0 : Math.min(M.n - 1, k + 1);  // sprite 1 duplicates the closed mouth
-    const put = k => g.drawImage(mouth, idx(k) * M.w, 0, M.w, M.h, M.x, M.y, M.w, M.h);
-    put(lo); if (a > 0.02) { g.globalAlpha = a; put(lo + 1); g.globalAlpha = 1; }
+    const [v, c] = listen(t);
+    // loudness: slow auto-gain, a little lead to make up for the analyser's smoothing
+    peak = Math.max(v, peak * 0.9985, 0.03);
+    const lead = Math.max(0, v + (v - prev) * 1.5); prev = v;
+    const target = Math.min(1, Math.max(0, (lead / peak - 0.14) / 0.72));
+    open += (target - open) * (target > open ? 0.6 : 0.3);
+    // lip shape: dull sounds (o, u) round the lips, bright sounds (e, i, s) stretch them
+    const isOpen = open > 0.18;
+    if (c >= 0 && v > peak * 0.2) {
+      cLo = Math.min(c, cLo + 0.002); cHi = Math.max(c, cHi - 0.002);
+      if (cHi - cLo > 1) shapeTo = Math.min(2, Math.max(0, (c - cLo) / (cHi - cLo) * 2.4 - 0.2));
+    } else if (c < 0 && isOpen && !wasOpen) shapeTo = Math.random() * 2; // no spectrum: vary per syllable
+    wasOpen = isOpen;
+    shape += (shapeTo - shape) * 0.22;
+
+    g.globalAlpha = 1; g.drawImage(base, 0, 0, 640, 640);
+    const f = Math.pow(open, 0.8) * (M.n - 1) * 0.9, k0 = Math.floor(f), k1 = Math.min(M.n - 1, k0 + 1), a = f - k0;
+    const r0 = Math.min(M.rows - 1, Math.floor(shape)), r1 = Math.min(M.rows - 1, r0 + 1), rb = shape - r0;
+    row(r0, k0, k1, a, g, M.x, M.y);
+    if (rb > 0.03 && r1 !== r0) { row(r1, k0, k1, a, tg, 0, 0); g.globalAlpha = rb; g.drawImage(tmp, M.x, M.y); g.globalAlpha = 1; }
     if (blink.complete) {
       if (t > nextBlink) { blinkAt = t; nextBlink = t + 2400 + Math.random() * 3200; }
       const b = t - blinkAt;
       if (blinkAt >= 0 && b < 210) g.drawImage(blink, (b > 60 && b < 150 ? 1 : 0) * B.w, 0, B.w, B.h, B.x, B.y, B.w, B.h);
     }
+    // a little head movement while she talks, eased in and out
+    live += (($('#stage').classList.contains('talking') ? 1 : 0) - live) * 0.06;
+    const x = (Math.sin(t / 2300) * 3 + Math.sin(t / 870) * 1.2) * live, y = (Math.sin(t / 3100 + 1) * 2 + open * 1.6) * live;
+    const rot = (Math.sin(t / 2900 + 2) * 0.45 + Math.sin(t / 1100) * 0.15) * live;
+    cv.style.transform = `translate(${x.toFixed(2)}px,${y.toFixed(2)}px) rotate(${rot.toFixed(3)}deg) scale(1.035)`;
   }
   function start() { if (!raf) { nextBlink = performance.now() + 1500; raf = requestAnimationFrame(frame); } }
-  function stop() { cancelAnimationFrame(raf); raf = 0; open = 0; }
+  function stop() { cancelAnimationFrame(raf); raf = 0; open = 0; live = 0; }
   return api;
 })();
 
@@ -549,6 +578,8 @@ async function startCall() {
     },
     onMessage: m => {
       if (L !== mine || !m || !m.message) return;
+      m = { ...m, message: m.message.replace(/\[[^\]\n]{1,24}\]\s*/g, '').trim() };
+      if (!m.message || /^[.\s…]+$/.test(m.message)) return;
       const me = m.source === 'user' || m.role === 'user';
       L.log.push({ role: me ? 'user' : 'tutor', text: m.message });
       if (me) { L.turns++; add(esc(m.message), 'msg me'); }

@@ -90,3 +90,27 @@ for p in patches:
     f=ref.copy(); f[y0:y1,x0:x1]=p; prev.append(cv2.resize(f[int(H*0.25):int(H*0.85),int(W*0.2):int(W*0.8)],(300,300)))
 f=ref.copy(); f[by0:by1,bx0:bx1]=bp[1]; prev.append(cv2.resize(f[int(H*0.25):int(H*0.85),int(W*0.2):int(W*0.8)],(300,300)))
 cv2.imwrite('preview.jpg',np.vstack([np.hstack(prev[:5]),np.hstack(prev[5:]+[np.zeros((300,300,3),np.uint8)]*(10-len(prev)))]))
+
+# ---- viseme grid: 3 mouth widths (round, neutral, wide) x 6 openness levels ----
+wds=np.array([r['wd'] for r in rows]); base_wd=float(np.linalg.norm(rp[61]-rp[291])/face_h)
+wt=[np.percentile(wds,12),np.percentile(wds,50),np.percentile(wds,90)]
+ot=np.linspace(0,np.percentile(ops,96),6)
+ws=wds.std()+1e-6; os_=ops.std()+1e-6
+print('width targets',[round(float(x),4) for x in wt],'base',round(base_wd,4),'open targets',[round(float(x),4) for x in ot])
+grid=[]; info=[]
+for wi,w in enumerate(wt):
+    row=[]
+    for k,t in enumerate(ot):
+        if k==0 and wi==1: row.append(ref[y0:y1,x0:x1].copy()); info.append('ref'); continue
+        best=min(rows,key=lambda r: ((r['op']-t)/os_)**2*3 + ((r['wd']-w)/ws)**2 + r['err']*0.25 + r['rot']*0.4)
+        a=best['a'][y0:y1,x0:x1].astype(np.float32); b=ref[y0:y1,x0:x1].astype(np.float32)
+        row.append(np.clip(a*mask+b*(1-mask),0,255).astype(np.uint8)); info.append((best['i'],round(best['op'],3),round(best['wd'],3)))
+    grid.append(row)
+for wi in range(3): print('row',wi,info[wi*6:(wi+1)*6])
+cv2.imwrite('mouth.jpg',np.vstack([np.hstack([sc(p) for p in row]) for row in grid]),[cv2.IMWRITE_JPEG_QUALITY,88])
+meta['mouth'].update(n=6,rows=3); json.dump(meta,open('face.json','w')); print(meta)
+prev=[]
+for row in grid:
+    for p in row:
+        f=ref.copy(); f[y0:y1,x0:x1]=p; prev.append(cv2.resize(f[int(H*0.3):int(H*0.8),int(W*0.25):int(W*0.75)],(240,240)))
+cv2.imwrite('preview2.jpg',np.vstack([np.hstack(prev[i*6:(i+1)*6]) for i in range(3)]))

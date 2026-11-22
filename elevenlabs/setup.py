@@ -43,11 +43,14 @@ agent = {
         'agent': {
             'first_message': '{{greeting}}', 'language': 'fr',
             'dynamic_variables': {'dynamic_variable_placeholders': DV},
-            'prompt': {'prompt': (HERE / 'prompt.md').read_text(), 'llm': LLM, 'temperature': 0.6, 'tool_ids': tool_ids},
+            'prompt': {'prompt': (HERE / 'prompt.md').read_text(), 'llm': LLM, 'temperature': 0.6, 'tool_ids': tool_ids,
+                       'reasoning_effort': os.environ.get('LINGOVIA_AGENT_EFFORT', 'low'), 'enable_reasoning_summary': False},
         },
         'tts': {'model_id': TTS, 'voice_id': VOICE},
         'asr': {'provider': 'scribe_realtime', 'keywords': ['hallo', 'goedemorgen', 'dank je wel', 'alsjeblieft', 'hoe gaat het', 'ik heet', 'tot ziens']},
-        'turn': {'turn_timeout': 12, 'turn_eagerness': 'patient', 'silence_end_call_timeout': 120},
+        # normal eagerness + speculative turn: answers about as fast as a person, without cutting off a learner who hesitates
+        'turn': {'turn_timeout': 12, 'turn_eagerness': 'normal', 'speculative_turn': True, 'turn_model': 'turn_v3',
+                 'spelling_patience': 'off', 'silence_end_call_timeout': 120},
         'conversation': {'max_duration_seconds': 1200, 'client_events': ['audio', 'interruption', 'user_transcript', 'agent_response', 'agent_response_correction', 'client_tool_call', 'vad_score']},
     },
 }
