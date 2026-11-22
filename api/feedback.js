@@ -7,6 +7,7 @@ const FAST = process.env.LINGOVIA_FAST_MODEL || 'claude-haiku-5-5';
 
 const Report = z.object({
   summary: z.string(),
+  takeaways: z.array(z.string()),
   strengths: z.array(z.string()),
   corrections: z.array(z.object({ said: z.string(), correct: z.string(), why: z.string() })),
   phrases: z.array(z.object({ target: z.string(), native: z.string() })),
@@ -44,8 +45,9 @@ export default async function handler(req, res) {
 The learner lines come from speech recognition and may contain transcription slips: only report mistakes that are clearly the learner's, and judge them against what a learner at this stage can know.
 Write everything for the learner in ${native}, warm and specific, addressing them as "tu". Fields:
 - summary: two sentences on how the call went.
+- takeaways: exactly three short points to remember from this call (a phrase with its meaning, a rule, or a habit to keep), one sentence each.
 - strengths: two or three concrete things they did well, quoting their own words when possible.
-- corrections: up to five real mistakes, each with what they said, the correct ${target}, and a one sentence reason. Empty if there were none.
+- corrections: the three most important real mistakes at most, each with what they said, the correct ${target}, and a one sentence reason. Empty if there were none.
 - phrases: up to eight ${target} phrases from the call worth memorising, with their ${native} meaning.
 - next_tip: one thing to focus on next time.
 - score: 0 to 100 for how well they handled today's goal for their level.`,

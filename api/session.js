@@ -1,6 +1,10 @@
 // Hands out a short-lived token for one realtime voice call with the tutor.
 const API = 'https://api.elevenlabs.io';
-const AGENT = process.env.ELEVENLABS_AGENT_ID || 'agent_8601m80jeex9ftjbzm5wceybjrje';
+// Production keeps its own agent. Preview deployments (branches) talk to a staging agent,
+// so work in progress on the tutor's instructions never reaches real learners.
+const PROD = process.env.ELEVENLABS_AGENT_ID || 'agent_8601m80jeex9ftjbzm5wceybjrje';
+const STAGING = process.env.ELEVENLABS_AGENT_ID_STAGING || 'agent_6901m81e19gkfj78wtj2qdr6yyed';
+const AGENT = process.env.VERCEL_ENV === 'production' ? PROD : STAGING;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });

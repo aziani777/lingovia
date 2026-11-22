@@ -79,8 +79,10 @@ h1,h2,h3{margin:0;line-height:1.15;letter-spacing:-.01em}
 .stage.talking #face{opacity:1}
 .stage video,.stage>img{transform:scale(1.035)}
 .stage #av3d{position:absolute;inset:0;opacity:0;pointer-events:none;transition:opacity .35s;overflow:hidden;background:radial-gradient(120% 90% at 50% 35%,#f7efe2 0%,#e7ddcb 45%,#b9cfc9 100%)}
-.stage #av3d canvas{position:absolute;inset:0;width:100%!important;height:100%!important;object-fit:contain}
+.stage #av3d canvas{position:absolute;inset:0}
 .stage.three #av3d{opacity:1}
+.stage.nophoto>img,.stage.nophoto #vIdle,.stage.nophoto #face{visibility:hidden}
+.stage.nophoto{background:radial-gradient(120% 90% at 50% 35%,#f7efe2 0%,#e7ddcb 45%,#b9cfc9 100%)}
 .stage::after{z-index:1;content:"";position:absolute;inset:auto 0 0 0;height:120px;background:linear-gradient(transparent,rgba(0,0,0,.65));pointer-events:none}
 .stage .hud{position:absolute;left:0;right:0;top:0;padding:calc(10px + var(--safe-t)) 12px 0;display:flex;gap:8px;align-items:center;z-index:2}
 .pill{background:rgba(0,0,0,.45);color:#fff;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:99px;padding:8px 12px;font-size:13px;font-weight:700;min-height:36px;display:inline-flex;align-items:center;gap:6px}
@@ -143,7 +145,45 @@ h1,h2,h3{margin:0;line-height:1.15;letter-spacing:-.01em}
 .cb.hang svg{width:28px;height:28px}
 .callbar .mid{flex:1;text-align:center;font-size:12px;color:var(--muted);font-weight:700;line-height:1.3}
 .callbar .mid b{display:block;font-size:15px;color:var(--ink);font-variant-numeric:tabular-nums}
-#lesson.call .stage{height:44dvh;max-height:none}
+/* full screen video call */
+#lesson.call .stage{flex:1;height:auto;max-height:none}
+#lesson.call .sheet{display:none}
+#lesson.call .stage::after{height:46%;background:linear-gradient(transparent,rgba(0,0,0,.72))}
+#lesson.call .stage::before{content:"";position:absolute;inset:0 0 auto 0;height:130px;background:linear-gradient(rgba(0,0,0,.45),transparent);z-index:1;pointer-events:none}
+#lesson.call #backBtn,#lesson.call #dayPill{display:none}
+#lesson.call .hud{justify-content:flex-end}
+#lesson.call .who{left:0;right:0;top:calc(14px + var(--safe-t));bottom:auto;text-align:center;pointer-events:none}
+#lesson.call .who b{font-size:20px}
+#lesson.call .who span{justify-content:center;font-size:13px}
+#timer:not(:empty)::before{content:"· "}
+.stage.listening .dot{background:#7CFC9A;animation:pulse 1.6s infinite}
+.cctl{position:absolute;left:0;right:0;bottom:0;z-index:4;display:flex;justify-content:space-evenly;align-items:center;padding:14px 10px calc(18px + var(--safe-b))}
+.cctl .cb{width:54px;height:54px;background:rgba(255,255,255,.18);border:0;color:#fff;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);font-size:12px}
+.cctl .cb.off{background:#fff;color:#1d2733}
+.cctl .cb.on{background:#fff;color:#1d2733}
+.cctl .cb.hang{width:66px;height:66px;background:#e5382b;color:#fff}
+.subs{position:absolute;left:14px;right:14px;bottom:calc(108px + var(--safe-b));z-index:3;display:none;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+#lesson.call .subs{display:flex}
+.subs .line{max-width:100%;background:rgba(0,0,0,.55);color:#fff;border-radius:14px;padding:9px 13px;font-size:16px;line-height:1.35;text-align:center;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);animation:in .2s ease}
+.subs .line small{display:block;font-size:13px;opacity:.8;margin-top:3px}
+.subs .line.me{background:rgba(15,92,92,.75);font-size:14px;align-self:flex-end}
+.subs .tcard{pointer-events:auto;width:100%;background:rgba(255,255,255,.96);color:var(--ink);border-radius:16px;padding:10px 14px;text-align:left;animation:in .25s ease;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.subs .tcard h4{margin:0 0 3px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--warn)}
+.subs .tcard b{display:block;font-size:17px;color:var(--teal)}
+.subs .tcard.fixc b{color:var(--ok)}
+.subs .tcard s{color:var(--muted);font-size:14px}
+.subs .tcard span{font-size:13px;color:var(--muted)}
+.stage video.pip{position:absolute;z-index:5;inset:auto;right:12px;top:calc(70px + var(--safe-t));width:96px;height:132px;border-radius:16px;object-fit:cover;object-position:center;background:#000;transform:scaleX(-1);box-shadow:0 6px 20px rgba(0,0,0,.4);border:2px solid rgba(255,255,255,.7);touch-action:none;cursor:grab}
+.lost{position:absolute;inset:0;z-index:6;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:24px}
+.lost>div{background:var(--card);border-radius:20px;padding:20px;max-width:340px;width:100%;text-align:center}
+.lost p{color:var(--muted);font-size:14px;margin:6px 0 14px}
+/* audio only */
+.orb{position:absolute;inset:0;z-index:1;display:none;align-items:center;justify-content:center;background:radial-gradient(120% 90% at 50% 35%,#16424a 0%,#0c2a30 60%,#071a1e 100%)}
+#lesson.audio .orb{display:flex}
+.orb i{width:150px;height:150px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffb27d,#f26b1d 60%,#b8480b);box-shadow:0 0 0 calc(var(--v,0) * 46px) rgba(242,107,29,.18),0 0 60px rgba(242,107,29,.45);transform:scale(calc(1 + var(--v,0) * .18));transition:transform .08s linear,box-shadow .08s linear}
+.orb b{position:absolute;color:#fff;font-size:44px;font-weight:800}
+.rowsw{display:flex;align-items:center;gap:12px;padding:12px 0 2px;border-top:1px solid var(--line);margin-top:6px}
+.rowsw div{flex:1}.rowsw b{display:block;font-size:15px}.rowsw span{font-size:13px;color:var(--muted)}
 .msg.her.tap{cursor:pointer}
 .msg.her .tr{font-size:14px;color:var(--muted);margin-top:6px;padding-top:6px;border-top:1px solid var(--line)}
 .msg.her .hint{font-size:11px;color:var(--muted);margin-top:4px;opacity:.8}
@@ -207,19 +247,25 @@ input[type=range]{width:120px;accent-color:var(--accent)}
         <button class="pill" id="backBtn" aria-label="Retour">‹ Parcours</button>
         <span class="pill" id="dayPill" style="margin-left:auto"></span>
         <button class="pill" id="endBtn" hidden>Terminer</button>
+        <button class="pill" id="helpBtn" hidden>Aide</button>
       </div>
-      <div class="who"><b id="tutorName">Sanne</b><span><i class="dot"></i><em id="status" style="font-style:normal">À l'écoute</em></span></div>
+      <div class="who"><b id="tutorName">Sanne</b><span><i class="dot"></i><em id="status" style="font-style:normal">À l'écoute</em><em id="timer" style="font-style:normal"></em></span></div>
+      <div class="orb" id="orb"><i></i><b></b></div>
+      <video class="pip" id="pip" playsinline muted hidden></video>
+      <div class="lost" id="lost" hidden><div><b>Connexion perdue</b><p>L'appel a été coupé. Ta conversation est conservée.</p>
+        <button class="btn block" id="resumeBtn">Reprendre l'appel</button><button class="btn block ghost" id="stopBtn" style="margin-top:8px">Terminer et voir le bilan</button></div></div>
+      <div class="subs" id="subs"></div>
+      <div class="cctl" id="cctl" hidden>
+        <button class="cb" id="muteBtn" aria-label="Couper le micro"></button>
+        <button class="cb" id="camBtn" aria-label="Caméra"></button>
+        <button class="cb" id="spkBtn" aria-label="Haut-parleur"></button>
+        <button class="cb" id="ccBtn" aria-label="Sous-titres"></button>
+        <button class="cb hang" id="hangBtn" aria-label="Raccrocher"></button>
+      </div>
     </div>
     <div class="sheet">
       <div id="chat"></div>
       <div id="sugg"></div>
-      <div class="callbar" id="callbar" hidden>
-        <button class="cb" id="muteBtn" aria-label="Couper le micro"></button>
-        <button class="cb" id="helpBtn" aria-label="Aide">Aide</button>
-        <div class="mid"><b id="timer">0:00</b><span id="callHint">Parle naturellement</span></div>
-        <button class="cb" id="kbBtn" aria-label="Écrire">Abc</button>
-        <button class="cb hang" id="hangBtn" aria-label="Raccrocher"></button>
-      </div>
       <div class="composer" id="composer" hidden>
         <button class="lang" id="langBtn" aria-label="Langue du micro">NL</button>
         <input id="txt" type="text" placeholder="Écris ou parle…" autocomplete="off" autocapitalize="sentences" enterkeyhint="send">
@@ -237,6 +283,7 @@ input[type=range]{width:120px;accent-color:var(--accent)}
 </div>
 
 <script src="/curriculum.js"></script>
+<script src="/avatars.js"></script>
 <script>
 (() => {
 'use strict';
@@ -248,17 +295,21 @@ const ICON = {
   send: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
   stop: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>',
   micOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 9v2a3 3 0 0 0 5 2.2M15 9.5V6a3 3 0 0 0-5.7-1.3M5 11a7 7 0 0 0 11.5 5.3M19 11a7 7 0 0 1-.6 2.8M12 18v3M3 3l18 18"/></svg>',
+  cam: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="13" height="12" rx="2.5"/><path d="m16 10 5-3v10l-5-3"/></svg>',
+  camOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h4.500a2.500 2.500 0 0 1 2.500 2.500V12m0 4.500a2.500 2.500 0 0 1-2.500 1.500h-8A2.500 2.500 0 0 1 3 15.500v-7A2.500 2.500 0 0 1 4.300 6.300M16 10l5-3v10l-3-1.800M3 3l18 18"/></svg>',
+  spkOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4zM16 9.500l5 5M21 9.500l-5 5"/></svg>',
   hang: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 9c-3.2 0-6.2.9-8.6 2.500-.9.6-1.200 1.800-.800 2.800l.8 1.900c.3.8 1.200 1.200 2 .9l2.600-.9c.7-.2 1.200-.900 1.200-1.700v-1.300c1.800-.5 3.800-.5 5.600 0v1.300c0 .8.5 1.500 1.200 1.700l2.600.9c.8.3 1.700-.1 2-.9l.8-1.900c.4-1 .1-2.200-.8-2.800C18.200 9.900 15.200 9 12 9z"/></svg>',
 };
 
 /* ---------- state ---------- */
 const KEY = 'lingovia.v1';
-const DEF = { pair: 'nl-fr', done: {}, streak: 0, last: '', cards: [], set: { rate: 0.85, showTr: true, unlockAll: false, three: true } };
+const DEF = { pair: 'nl-fr', done: {}, streak: 0, last: '', cards: [], set: { rate: 0.85, showTr: true, unlockAll: false, three: true, avatar: 'sanne', subs: 1, audioOnly: false } };
 let S;
 try { S = Object.assign({}, DEF, JSON.parse(localStorage.getItem(KEY) || '{}')); S.set = Object.assign({}, DEF.set, S.set); }
 catch { S = structuredClone(DEF); }
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} };
 const C = () => window.COURSES[S.pair] || window.COURSES['nl-fr'];
+const AV = () => window.AVATARS.find(a => a.id === S.set.avatar) || window.AVATARS[0];
 const today = () => new Date().toISOString().slice(0, 10);
 const doneCount = () => Object.keys(S.done).length;
 const currentDay = () => { for (let d = 1; d <= 90; d++) if (!S.done[d]) return d; return 90; };
@@ -388,28 +439,51 @@ async function speak(items, slow) {
 
 /* ---------- 3D avatar (TalkingHead, MIT) ---------- */
 const av3d = (() => {
-  let head = null, loading = null, lastEnd = 0;
+  let head = null, booting = null, shown = null, lastEnd = 0, token = 0;
+  const REACT = { smile: '😊', laugh: '😄', surprised: '😳', thinking: '🤔', wink: '😉', nod: 'yes', shake_head: 'no', wave: '👋',
+    thumbs_up: '👍', ok: '👌', shrug: '🤷', proud: '🥰', oops: '😬' };
   const on = () => !!head && $('#stage').classList.contains('three');
-  function load() {
-    return loading || (loading = (async () => {
+  function boot() {
+    return booting || (booting = (async () => {
       const { TalkingHead } = await import('/vendor/talkinghead/talkinghead.mjs');
-      const h = new TalkingHead($('#av3d'), { ttsEndpoint: null, lipsyncModules: [], cameraView: 'head', cameraDistance: 0.4, cameraY: 0.09, cameraRotateEnable: false,
-        modelFPS: 30, modelPixelRatio: Math.min(2, window.devicePixelRatio || 1), avatarMood: 'happy',
+      head = new TalkingHead($('#av3d'), { ttsEndpoint: null, lipsyncModules: [], cameraView: 'head', cameraDistance: 0.4, cameraY: 0.09,
+        cameraRotateEnable: false, modelFPS: 30, modelPixelRatio: Math.min(2, window.devicePixelRatio || 1),
         avatarIdleEyeContact: 0.6, avatarSpeakingEyeContact: 0.8, avatarSpeakingHeadMove: 0.6, lightAmbientIntensity: 2, lightDirectIntensity: 20 });
-      await h.showAvatar({ url: '/assets/avatars/tutor.glb', body: 'F', avatarMood: 'happy', lipsyncLang: 'en' });
-      head = h; return true;
-    })().catch(() => { loading = null; head = null; return false; }));
+      return true;
+    })().catch(() => { booting = null; head = null; return false; }));
   }
   async function show() {
+    const a = AV(), my = ++token;
+    $('#stage').classList.toggle('nophoto', a.id !== 'sanne');
     if (!S.set.three) return hide();
-    if (await load()) { try { head.start(); } catch {} $('#stage').classList.add('three'); }
+    if (!(await boot()) || my !== token) return;
+    if (shown !== a.id) {
+      $('#stage').classList.remove('three');
+      try { await head.showAvatar({ url: a.model, lipsyncLang: 'en', ...a.opts }); shown = a.id; }
+      catch { shown = null; return; }
+      if (my !== token) return;
+    }
+    try { head.start(); } catch {}
+    $('#stage').classList.add('three'); view($('#lesson').classList.contains('call'));
   }
-  function hide() { $('#stage').classList.remove('three'); if (head) { try { head.stop(); } catch {} } }
+  function hide() { token++; $('#stage').classList.remove('three'); if (head) { try { head.stop(); } catch {} } }
+  // call: waist-up so the hands are visible. lesson card: face only.
+  function view(call) { if (!head) return; try { head.setView(call ? 'upper' : 'head', call ? { cameraDistance: 0.2, cameraY: 0.06 } : { cameraDistance: 0.4, cameraY: 0.09 }); } catch {} }
   function set(k, v) { if (!on()) return; const m = head.mtAvatar && head.mtAvatar[k]; if (m) { m.newvalue = v; m.needsUpdate = true; } }
   // a new sentence: look at the learner and gesture, like a person starting to talk
   function sentence() { if (!on()) return; if (Date.now() - lastEnd > 400) { try { head.lookAtCamera(600); head.speakWithHands(); } catch {} } }
   function ended() { lastEnd = Date.now(); }
-  return { show, hide, set, sentence, ended, on, get head() { return head; }, peek: k => head && head.mtAvatar && head.mtAvatar[k] ? head.mtAvatar[k].value : null };
+  // facial expression or gesture, by name (see REACT)
+  function react(name, dur) {
+    if (!on()) return;
+    let g = REACT[name]; if (!g) return;
+    if (name === 'shrug') g = AV().gender === 'M' ? '🤷‍♂️' : '🤷‍♀️';
+    try { head.playGesture(g, dur || 3); } catch {}
+  }
+  function mood(m) { if (!on()) return; try { head.setMood(m || AV().mood || 'neutral'); } catch {} }
+  function look() { if (on()) { try { head.lookAtCamera(1200); } catch {} } }
+  return { show, hide, view, set, sentence, ended, react, mood, look, on, reactions: Object.keys(REACT), get head() { return head; },
+    peek: k => head && head.mtAvatar && head.mtAvatar[k] ? head.mtAvatar[k].value : null };
 })();
 
 /* ---------- face: mouth shapes driven by the voice ---------- */
@@ -585,17 +659,18 @@ function openLesson(d) {
   loadSDK();
   micLang = 'target';
   chat.innerHTML = ''; $('#sugg').innerHTML = ''; $('#txt').value = '';
-  $('#composer').hidden = true; $('#endBtn').hidden = true; $('#callbar').hidden = true; $('#lesson').classList.remove('call');
+  $('#composer').hidden = true; $('#endBtn').hidden = true; $('#lesson').classList.remove('call'); camOff();
   $('#dayPill').textContent = `Jour ${d} · ${info.level}`;
-  $('#tutorName').textContent = C().tutor;
+  $('#tutorName').textContent = AV().name; $('#timer').textContent = ''; $('#helpBtn').hidden = true; $('#cctl').hidden = true; $('#lost').hidden = true; $('#subs').innerHTML = ''; $('#lesson').classList.remove('audio'); $('#orb').querySelector('b').textContent = AV().name[0];
   show('lesson');
   $('#vIdle').play().catch(() => {}); face.start(); av3d.show();
   add(`<h3>${esc(info.title)}</h3><p class="sub">${esc(info.focus)}. ${esc(info.scenario)}</p>
     ${info.phrases.map((p, i) => `<button class="ph" data-say="${i}"><div><b>${esc(p.target)}</b><span>${esc(p.native)}</span></div>${ICON.spk}</button>`).join('')}
-    <button class="btn block" id="startBtn" style="margin-top:14px">Appeler ${esc(C().tutor)}</button>`, 'card');
+    <button class="btn block" id="startBtn" style="margin-top:14px">Appeler ${esc(AV().name)}</button>
+    <div class="rowsw"><div><b>Mode audio seul</b><span>Sans avatar, pour pratiquer en marchant.</span></div><button class="sw ${S.set.audioOnly ? 'on' : ''}" id="audioSw" aria-label="Mode audio seul"></button></div>`, 'card');
   paintMic();
 }
-function closeLesson() { if (L && L.conv) { const c = L.conv; L.conv = null; c.endSession().catch(() => {}); } clearInterval(tick); releaseWake(); stopSpeaking(); stopListening(); $('#vIdle').pause(); face.stop(); av3d.hide(); L = null; show('home'); }
+function closeLesson() { if (L && L.conv) { const c = L.conv; L.conv = null; c.endSession().catch(() => {}); } clearInterval(tick); releaseWake(); camOff(); stopSpeaking(); stopListening(); $('#vIdle').pause(); face.stop(); av3d.hide(); L = null; show('home'); }
 $('#backBtn').addEventListener('click', closeLesson);
 $('#endBtn').addEventListener('click', () => finish());
 
@@ -604,6 +679,8 @@ chat.addEventListener('click', e => {
   const say = e.target.closest('[data-say]');
   if (say) { unlockAudio(); return speak([{ lang: 'target', text: L.info.phrases[+say.dataset.say].target }]); }
   if (e.target.closest('#againBtn')) return openLesson(L.info.n);
+  if (e.target.closest('#textBtn')) { e.target.closest('.card').remove(); return textMode(); }
+  const sw = e.target.closest('#audioSw'); if (sw) { S.set.audioOnly = !S.set.audioOnly; save(); return sw.classList.toggle('on', S.set.audioOnly); }
   const pc = e.target.closest('.pc'); if (pc) return speak([{ lang: 'target', text: pc.dataset.t }]);
   const tap = e.target.closest('.msg.her.tap'); if (tap) return translate(tap);
   if (e.target.closest('#startBtn')) { e.target.closest('#startBtn').remove(); return begin(); }
@@ -639,19 +716,51 @@ const greeting = (d, t) => d === 1 ? 'Hallo ! Moi c\'est Sanne, ta prof de néer
   : d <= 60 ? 'Hoi! Leuk je weer te zien. Hoe gaat het met je vandaag?'
   : 'Hé, hallo! Hoe is het? Vertel, wat heb je vandaag gedaan?';
 
-async function startCall() {
-  const mine = L, i = L.info;
-  $('#status').textContent = 'Appel en cours';
+// state shown under the tutor's name: listening, thinking or speaking
+function setState(st) {
+  const stage = $('#stage');
+  stage.classList.toggle('talking', st === 'speaking'); stage.classList.toggle('thinking', st === 'thinking'); stage.classList.toggle('listening', st === 'listening');
+  $('#status').textContent = { speaking: 'Parle', thinking: 'Réfléchit', listening: 'T\'écoute', connecting: 'Appel en cours', online: 'En ligne', ended: 'Appel terminé', lost: 'Connexion perdue' }[st] || '';
+  if (L) L.state = st;
+}
+/* subtitles: last thing each side said, plus cards for phrases and corrections */
+function sub(html, cls, ttl) {
+  const box = $('#subs'), d = document.createElement('div'); d.className = cls; d.innerHTML = html;
+  if (cls.startsWith('line')) box.querySelectorAll('.' + cls.split(' ').join('.')).forEach(e => e.remove());
+  box.appendChild(d);
+  while (box.children.length > 3) box.firstChild.remove();
+  if (ttl) setTimeout(() => d.remove(), ttl);
+  return d;
+}
+async function subTutor(text) {
+  if (!S.set.subs) return;
+  const d = sub(esc(text), 'line her');
+  if (S.set.subs < 2) return;
+  try {
+    const r = await fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ translate: text, targetName: C().target.name, nativeName: C().native.name }) });
+    if (r.ok && d.isConnected) { const t = (await r.json()).translation; if (t && norm(t) !== norm(text)) { const sm = document.createElement('small'); sm.textContent = t; d.appendChild(sm); } }
+  } catch {}
+}
+
+async function startCall(resume) {
+  const mine = L, i = L.info, av = AV();
+  setState('connecting');
   const [ok, r] = await Promise.all([loadSDK(), fetch('/api/session', { method: 'POST' })]);
   if (!ok || !r.ok) throw new Error('unavailable');
   const { token, signedUrl } = await r.json();
   const opts = {
     dynamicVariables: { day: String(i.n), level: i.level, lesson_title: i.title, focus: i.focus, scenario: i.scenario,
-      phrases: i.phrases.map(p => `- ${p.target} = ${p.native}`).join('\n'), balance: balance(i.n), greeting: greeting(i.n, i.title) },
+      phrases: i.phrases.map(p => `- ${p.target} = ${p.native}`).join('\n'), balance: balance(i.n),
+      greeting: resume ? 'Ah, te revoilà ! On a été coupés. On reprend où on en était ?' : greeting(i.n, i.title) },
     clientTools: {
-      show_phrase: ({ dutch, french }) => { if (L === mine && dutch) { learn({ target: dutch, native: french || '' }); add(`${ICON.spk}<div><b>${esc(dutch)}</b><span>${esc(french)}</span></div>`, 'pc').dataset.t = dutch; } },
-      show_correction: ({ said, correct, why }) => { if (L === mine && correct) { L.fixes.push({ said, correct, why }); add(`<h4>Petite correction</h4><s>${esc(said)}</s><div class="good">${esc(correct)}</div><p>${esc(why)}</p>`, 'fix'); } },
-      lesson_done: ({ praise }) => { if (L === mine) { L.complete = true; L.praise = praise || ''; } },
+      show_phrase: ({ dutch, french }) => { if (L !== mine || !dutch) return; learn({ target: dutch, native: french || '' });
+        add(`${ICON.spk}<div><b>${esc(dutch)}</b><span>${esc(french)}</span></div>`, 'pc').dataset.t = dutch;
+        sub(`<b>${esc(dutch)}</b><span>${esc(french)}</span>`, 'tcard', 9000); },
+      show_correction: ({ said, correct, why }) => { if (L !== mine || !correct) return; L.fixes.push({ said, correct, why });
+        add(`<h4>Petite correction</h4><s>${esc(said)}</s><div class="good">${esc(correct)}</div><p>${esc(why)}</p>`, 'fix');
+        sub(`<h4>Petite correction</h4><s>${esc(said)}</s><b>${esc(correct)}</b><span>${esc(why)}</span>`, 'tcard fixc', 11000); av3d.react('thinking', 2); },
+      lesson_done: ({ praise }) => { if (L === mine) { L.complete = true; L.praise = praise || ''; av3d.react('thumbs_up', 3); } },
+      react: ({ reaction }) => { if (L === mine) av3d.react(reaction); },
     },
     onMessage: m => {
       if (L !== mine || !m || !m.message) return;
@@ -659,17 +768,22 @@ async function startCall() {
       if (!m.message || /^[.\s…]+$/.test(m.message)) return;
       const me = m.source === 'user' || m.role === 'user';
       L.log.push({ role: me ? 'user' : 'tutor', text: m.message });
-      if (me) { L.turns++; add(esc(m.message), 'msg me'); }
-      else add(`<div>${esc(m.message)}</div><div class="hint">Touche pour traduire</div>`, 'msg her tap').dataset.x = m.message;
+      if (me) { L.turns++; add(esc(m.message), 'msg me'); if (S.set.subs) sub(esc(m.message), 'line me', 5000);
+        if (L.state !== 'speaking') { setState('thinking'); if (Math.random() < 0.45) av3d.react('nod', 2); } }
+      else { add(`<div>${esc(m.message)}</div><div class="hint">Touche pour traduire</div>`, 'msg her tap').dataset.x = m.message; subTutor(m.message); }
     },
     onModeChange: ({ mode }) => {
       if (L !== mine) return;
       const talking = mode === 'speaking';
-      $('#stage').classList.toggle('talking', talking);
-      $('#status').textContent = talking ? 'Parle' : 'Je t\'écoute';
+      if (talking) setState('speaking'); else if (L.state !== 'thinking') { setState('listening'); av3d.look(); }
       if (!talking && L.complete) setTimeout(() => { if (L === mine && L.conv) endCall(); }, 1500);
     },
-    onDisconnect: () => { if (L === mine && L.conv) { L.conv = null; afterCall(); } },
+    onDisconnect: d => {
+      if (L !== mine || !L.conv) return;         // we hung up ourselves
+      L.conv = null; clearInterval(tick);
+      if (d && d.reason === 'error' || !navigator.onLine) { setState('lost'); $('#lost').hidden = false; }
+      else afterCall();
+    },
     onError: () => {},
   };
   const C2 = window.ElevenLabsClient.Conversation;
@@ -677,19 +791,53 @@ async function startCall() {
   try { if (!token) throw new Error('no token'); conv = await C2.startSession({ conversationToken: token, connectionType: 'webrtc', ...opts }); }
   catch (e) { if (!signedUrl || (e && e.name === 'NotAllowedError')) throw e; conv = await C2.startSession({ signedUrl, connectionType: 'websocket', ...opts }); }
   if (L !== mine) { conv.endSession().catch(() => {}); return; }
-  L.conv = conv; L.mode = 'call'; L.t0 = Date.now(); L.muted = false;
+  L.conv = conv; L.mode = 'call'; L.muted = false; L.quiet = false;
+  if (!resume) L.t0 = Date.now();
   try { face.attach(conv.output && conv.output.getAnalyser && conv.output.getAnalyser()); } catch {}
-  $('#lesson').classList.add('call'); $('#callbar').hidden = false; $('#status').textContent = 'En ligne'; paintCall();
+  const audio = S.set.audioOnly;
+  $('#lesson').classList.add('call'); $('#lesson').classList.toggle('audio', audio);
+  $('#cctl').hidden = false; $('#helpBtn').hidden = false; $('#lost').hidden = true; setState('online'); paintCall();
+  if (audio) av3d.hide(); else { av3d.view(true); setTimeout(() => av3d.react('wave', 2.5), 500); }
   clearInterval(tick);
-  tick = setInterval(() => { const t = Math.floor((Date.now() - mine.t0) / 1000); $('#timer').textContent = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; }, 1000);
+  tick = setInterval(() => {
+    const t = Math.floor((Date.now() - mine.t0) / 1000); $('#timer').textContent = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+    if (mine.limit && t >= mine.limit && mine.conv) endCall();
+  }, 1000);
+  if (audio) { const orb = $('#orb'); const beat = () => { if (L !== mine || !mine.conv) return; let v = 0; try { v = mine.conv.getOutputVolume() || 0; } catch {} orb.style.setProperty('--v', Math.min(1, v * 2.2).toFixed(2)); requestAnimationFrame(beat); }; beat(); }
   try { wake = await navigator.wakeLock?.request('screen'); } catch {}
 }
 function learn(p) { if (p.target && !L.learned.some(x => x.target === p.target)) L.learned.push(p); }
 function paintCall() {
   const m = $('#muteBtn'); m.innerHTML = L && L.muted ? ICON.micOff : ICON.mic; m.classList.toggle('off', !!(L && L.muted));
+  const c = $('#camBtn'); c.innerHTML = cam ? ICON.cam : ICON.camOff; c.classList.toggle('on', !!cam);
+  const k = $('#spkBtn'); k.innerHTML = L && L.quiet ? ICON.spkOff : ICON.spk; k.classList.toggle('off', !!(L && L.quiet));
+  const cc = $('#ccBtn'); cc.textContent = S.set.subs === 2 ? 'CC FR' : 'CC'; cc.classList.toggle('on', S.set.subs > 0);
   $('#hangBtn').innerHTML = ICON.hang;
-  $('#callHint').textContent = L && L.muted ? 'Micro coupé' : 'Parle naturellement';
 }
+/* camera preview: local only, never sent or recorded */
+let cam = null;
+async function camOn() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return toast('Caméra non disponible sur cet appareil.');
+  try {
+    cam = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 480 } }, audio: false });
+    const v = $('#pip'); v.srcObject = cam; v.hidden = false; v.play().catch(() => {});
+  } catch (e) {
+    cam = null;
+    toast(e && e.name === 'NotAllowedError' ? 'Caméra refusée. Autorise-la dans les réglages du navigateur.' : 'Impossible d\'ouvrir la caméra.');
+  }
+  paintCall();
+}
+function camOff() { if (cam) { cam.getTracks().forEach(t => t.stop()); cam = null; } const v = $('#pip'); v.srcObject = null; v.hidden = true; v.style.left = v.style.top = ''; v.style.right = ''; }
+(() => { // drag the preview, then snap to the nearest side
+  const v = $('#pip'); let ox = 0, oy = 0, drag = false;
+  v.addEventListener('pointerdown', e => { drag = true; const r = v.getBoundingClientRect(); ox = e.clientX - r.left; oy = e.clientY - r.top; v.setPointerCapture(e.pointerId); });
+  v.addEventListener('pointermove', e => { if (!drag) return; const s = $('#stage').getBoundingClientRect();
+    v.style.right = 'auto'; v.style.left = Math.max(8, Math.min(s.width - v.offsetWidth - 8, e.clientX - s.left - ox)) + 'px';
+    v.style.top = Math.max(8, Math.min(s.height - v.offsetHeight - 110, e.clientY - s.top - oy)) + 'px'; });
+  const drop = () => { if (!drag) return; drag = false; const s = $('#stage').getBoundingClientRect(), r = v.getBoundingClientRect();
+    v.style.transition = 'left .2s'; v.style.left = (r.left + r.width / 2 - s.left < s.width / 2 ? 12 : s.width - r.width - 12) + 'px'; setTimeout(() => v.style.transition = '', 220); };
+  v.addEventListener('pointerup', drop); v.addEventListener('pointercancel', drop);
+})();
 async function endCall() {
   if (!L || !L.conv) return;
   const c = L.conv; L.conv = null;
@@ -700,11 +848,13 @@ async function afterCall() {
   if (!L || L.reported) return;
   L.reported = true; const mine = L, i = L.info;
   clearInterval(tick); releaseWake();
-  $('#callbar').hidden = true; $('#composer').hidden = true; $('#lesson').classList.remove('call');
-  $('#stage').classList.remove('talking'); $('#status').textContent = 'Appel terminé';
+  $('#cctl').hidden = true; $('#helpBtn').hidden = true; $('#lost').hidden = true; $('#composer').hidden = true; $('#lesson').classList.remove('call', 'audio');
+  camOff(); $('#subs').innerHTML = ''; setState('ended'); $('#timer').textContent = '';
+  if (S.set.audioOnly) av3d.show(); else av3d.view(false);
   const said = L.log.filter(m => m.role === 'user').length;
-  if (said < 2) return add(`<h3>Appel terminé</h3><p class="sub">L'appel a été trop court pour valider la leçon.</p><button class="btn block" id="againBtn">Rappeler ${esc(C().tutor)}</button>`, 'card');
-  const card = add(`<h3>Bilan de l'appel</h3><p class="sub">${esc(C().tutor)} prépare ton retour…</p><div class="typing"><i></i><i></i><i></i></div>`, 'card rep');
+  const secs = Math.max(1, Math.round((Date.now() - L.t0) / 1000)), dur = `${Math.floor(secs / 60)} min ${String(secs % 60).padStart(2, '0')} s`;
+  if (said < 2) return add(`<h3>Appel terminé</h3><p class="sub">Durée ${dur}. L'appel a été trop court pour faire un bilan.</p><button class="btn block" id="againBtn">Rappeler ${esc(AV().name)}</button>`, 'card');
+  const card = add(`<h3>Appel terminé</h3><p class="sub">Durée ${dur}. ${esc(AV().name)} prépare ton bilan…</p><div class="typing"><i></i><i></i><i></i></div>`, 'card rep');
   let rep = null;
   try {
     const r = await fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
@@ -712,15 +862,13 @@ async function afterCall() {
     if (r.ok) rep = await r.json();
   } catch {}
   if (L !== mine) return;
-  if (!rep) rep = { summary: L.praise || 'Bel appel. Voici ce que tu as travaillé.', strengths: [], corrections: L.fixes, phrases: [], next_tip: '', score: null };
+  if (!rep) rep = { summary: L.praise || 'Bel appel.', takeaways: L.learned.slice(0, 3).map(p => `${p.target} = ${p.native}`), corrections: L.fixes, phrases: [], score: null };
   for (const p of rep.phrases || []) learn(p);
-  const mins = Math.max(1, Math.round((Date.now() - L.t0) / 60000));
-  card.innerHTML = `<div style="display:flex;align-items:flex-end;gap:12px;justify-content:space-between"><div><h3>Bilan de l'appel</h3><p class="sub" style="margin:0">${mins} min de conversation · ${said} prises de parole</p></div>${rep.score != null ? `<div class="score">${Math.round(rep.score)}</div>` : ''}</div>
+  const keep = (rep.takeaways || []).slice(0, 3), fixes = (rep.corrections || []).slice(0, 3);
+  card.innerHTML = `<div style="display:flex;align-items:flex-end;gap:12px;justify-content:space-between"><div><h3>Appel terminé</h3><p class="sub" style="margin:0">Durée ${dur} · ${said} prises de parole</p></div>${rep.score != null ? `<div class="score">${Math.round(rep.score)}</div>` : ''}</div>
     <p style="margin:12px 0 0">${esc(rep.summary)}</p>
-    ${rep.strengths?.length ? `<h4>Ce que tu as bien fait</h4><ul>${rep.strengths.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
-    ${rep.corrections?.length ? `<h4>À corriger</h4>${rep.corrections.map(f => `<div class="fx"><s>${esc(f.said)}</s><b>${esc(f.correct)}</b><span>${esc(f.why)}</span></div>`).join('')}` : ''}
-    ${L.learned.length ? `<h4>Phrases à retenir</h4>${L.learned.slice(0, 10).map(p => `<div class="fx"><b style="color:var(--teal)">${esc(p.target)}</b><span>${esc(p.native)}</span></div>`).join('')}` : ''}
-    ${rep.next_tip ? `<h4>Pour la prochaine fois</h4><p style="margin:0">${esc(rep.next_tip)}</p>` : ''}
+    <h4>3 points à retenir</h4>${keep.length ? `<ul>${keep.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '<p style="margin:0;color:var(--muted)">Rien de nouveau cette fois.</p>'}
+    <h4>3 corrections principales</h4>${fixes.length ? fixes.map(f => `<div class="fx"><s>${esc(f.said)}</s><b>${esc(f.correct)}</b><span>${esc(f.why)}</span></div>`).join('') : '<p style="margin:0;color:var(--muted)">Aucune faute importante. Bravo.</p>'}
     <button class="btn block teal" id="doneBtn" style="margin-top:16px">Valider le jour ${i.n}</button>
     <button class="btn block ghost" id="againBtn" style="margin-top:8px">Refaire l'appel</button>`;
   card.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -737,11 +885,21 @@ async function translate(el) {
   if (!t) return toast('Traduction indisponible');
   const d = document.createElement('div'); d.className = 'tr'; d.textContent = t; el.appendChild(d); scrollDown();
 }
-$('#muteBtn').addEventListener('click', () => { if (!L || !L.conv) return; L.muted = !L.muted; try { L.conv.setMicMuted(L.muted); } catch {} paintCall(); });
+$('#muteBtn').addEventListener('click', () => { if (!L || !L.conv) return; L.muted = !L.muted; try { L.conv.setMicMuted(L.muted); } catch {} paintCall(); toast(L.muted ? 'Micro coupé' : 'Micro activé'); });
+$('#camBtn').addEventListener('click', async () => { if (cam) { camOff(); paintCall(); } else await camOn(); });
+$('#spkBtn').addEventListener('click', () => { if (!L || !L.conv) return; L.quiet = !L.quiet; try { L.conv.setVolume({ volume: L.quiet ? 0 : 1 }); } catch {} paintCall(); toast(L.quiet ? 'Son coupé' : 'Son activé'); });
+$('#ccBtn').addEventListener('click', () => { S.set.subs = (S.set.subs + 1) % 3; save(); paintCall(); if (!S.set.subs) $('#subs').querySelectorAll('.line').forEach(e => e.remove());
+  toast(['Sous-titres désactivés', 'Sous-titres activés', 'Sous-titres avec traduction'][S.set.subs]); });
 $('#hangBtn').addEventListener('click', endCall);
-$('#helpBtn').addEventListener('click', () => { if (L && L.conv) { try { L.conv.sendUserMessage('Je suis bloqué. Aide-moi: donne-moi la phrase à dire en néerlandais, lentement, avec sa traduction.'); } catch {} toast('Sanne va t\'aider'); } });
-$('#kbBtn').addEventListener('click', () => { const c = $('#composer'); c.hidden = !c.hidden; if (!c.hidden) $('#txt').focus(); });
+$('#helpBtn').addEventListener('click', () => { if (L && L.conv) { try { L.conv.sendUserMessage('Je suis bloqué. Aide-moi: donne-moi la phrase à dire, lentement, avec sa traduction.'); } catch {} toast(`${AV().name} va t'aider`); } });
+$('#resumeBtn').addEventListener('click', async () => {
+  if (!L) return; const mine = L; $('#lost').hidden = true;
+  try { await startCall(true); } catch { if (L === mine) { $('#lost').hidden = false; toast('Toujours pas de connexion. Réessaie dans un instant.'); } }
+});
+$('#stopBtn').addEventListener('click', () => { $('#lost').hidden = true; afterCall(); });
+window.addEventListener('offline', () => { if (L && L.conv) toast('Connexion instable…'); });
 
+function textMode() { if (!L) return; L.mode = 'ai'; L.started = true; $('#composer').hidden = false; turn('[START]', true); }
 async function begin() {
   const mine = L;
   L.started = true; unlockAudio();
@@ -749,12 +907,14 @@ async function begin() {
   try { await startCall(); document.getElementById('ringing')?.remove(); return; }
   catch (e) {
     if (L !== mine) return;
-    document.getElementById('ringing')?.remove();
+    document.getElementById('ringing')?.remove(); setState('ended');
     const denied = e && (e.name === 'NotAllowedError' || /permission|denied/i.test(e.message || ''));
-    add(denied ? 'Micro refusé. Autorise le micro pour appeler Sanne. En attendant, voici le mode texte.' : 'Appel vocal indisponible pour le moment. Voici le mode texte.', 'note');
+    if (denied) return add(`<h3>Micro refusé</h3><p class="sub">${esc(AV().name)} a besoin de ton micro pour t'entendre. Autorise-le dans les réglages du navigateur pour ce site, puis réessaie.</p>
+      <button class="btn block" id="againBtn">Réessayer</button><button class="btn block ghost" id="textBtn" style="margin-top:8px">Continuer par écrit</button>`, 'card');
+    add(navigator.onLine ? 'Appel vocal indisponible pour le moment. Voici le mode texte.' : 'Pas de connexion internet. Vérifie ton réseau puis réessaie.', 'note');
+    if (!navigator.onLine) return add(`<button class="btn block" id="againBtn">Réessayer</button>`, 'card');
   }
-  L.mode = 'ai'; $('#composer').hidden = false;
-  turn('[START]', true);
+  textMode();
 }
 function submit(text) {
   if (L && L.conv) { $('#txt').value = ''; paintMic(); L.log.push({ role: 'user', text }); L.turns++; add(esc(text), 'msg me'); try { L.conv.sendUserMessage(text); } catch {} return; }

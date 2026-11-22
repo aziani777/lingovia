@@ -17,7 +17,8 @@ def call(method, path, body=None):
     except urllib.error.HTTPError as e:
         sys.exit(f'{method} {path} -> {e.code} {e.read().decode()[:1500]}')
 
-def s(desc): return {'type': 'string', 'description': desc}
+def s(desc, enum=None): return {'type': 'string', 'description': desc, **({'enum': enum} if enum else {})}
+REACTIONS = ['smile', 'laugh', 'surprised', 'thinking', 'wink', 'nod', 'shake_head', 'wave', 'thumbs_up', 'ok', 'shrug', 'proud', 'oops']
 TOOLS = [
     ('show_phrase', 'Show a Dutch phrase and its French meaning on the learner\'s screen. Call it whenever you teach or use a Dutch phrase worth remembering.',
      {'dutch': s('The Dutch phrase, exactly as said.'), 'french': s('Its French meaning.')}),
@@ -25,6 +26,8 @@ TOOLS = [
      {'said': s('What the learner said.'), 'correct': s('The correct Dutch sentence.'), 'why': s('One short sentence in French explaining the mistake.')}),
     ('lesson_done', 'Mark today\'s lesson as completed. Call once, when the learner has managed the key phrases and the scene has been played.',
      {'praise': s('One short sentence in French about what the learner did well.')}),
+    ('react', 'Make your on-screen body react: a facial expression or a hand gesture. Call it often, the way a person reacts while talking.',
+     {'reaction': s('The reaction to show.', REACTIONS)}),
 ]
 
 existing = {t['tool_config']['name']: t['id'] for t in call('GET', '/v1/convai/tools').get('tools', []) if t['tool_config'].get('type') == 'client'}
@@ -38,7 +41,7 @@ for name, desc, props in TOOLS:
 DV = {'day': '1', 'level': 'A0', 'lesson_title': 'Dire bonjour', 'focus': 'Les salutations', 'scenario': 'Première rencontre.',
       'phrases': '- Hallo! = Salut !', 'balance': 'Mostly French, with short Dutch phrases.', 'greeting': 'Hallo! Moi c\'est Sanne. Tu es prêt ?'}
 agent = {
-    'name': 'Lingovia - Sanne (nl-fr)',
+    'name': os.environ.get('LINGOVIA_AGENT_NAME', 'Lingovia - Sanne (nl-fr)'),
     'conversation_config': {
         'agent': {
             'first_message': '{{greeting}}', 'language': 'fr',
