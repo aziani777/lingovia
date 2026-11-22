@@ -130,6 +130,25 @@ h1,h2,h3{margin:0;line-height:1.15;letter-spacing:-.01em}
 .mic.live{background:#d92d20;animation:ring 1.2s infinite}
 @keyframes ring{0%{box-shadow:0 0 0 0 rgba(217,45,32,.5)}100%{box-shadow:0 0 0 16px rgba(217,45,32,0)}}
 
+.callbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 18px calc(12px + var(--safe-b));border-top:1px solid var(--line);background:var(--card)}
+.cb{width:52px;height:52px;border-radius:50%;background:var(--bg);border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none;font-size:11px;font-weight:800;color:var(--teal)}
+.cb svg{width:22px;height:22px}
+.cb.off{background:#fde3e1;border-color:#f6b9b4;color:#b42318}
+.cb.hang{width:64px;height:64px;background:#d92d20;border-color:#d92d20;color:#fff;box-shadow:0 4px 14px rgba(217,45,32,.4)}
+.cb.hang svg{width:28px;height:28px}
+.callbar .mid{flex:1;text-align:center;font-size:12px;color:var(--muted);font-weight:700;line-height:1.3}
+.callbar .mid b{display:block;font-size:15px;color:var(--ink);font-variant-numeric:tabular-nums}
+#lesson.call .stage{height:44dvh;max-height:none}
+.msg.her.tap{cursor:pointer}
+.msg.her .tr{font-size:14px;color:var(--muted);margin-top:6px;padding-top:6px;border-top:1px solid var(--line)}
+.msg.her .hint{font-size:11px;color:var(--muted);margin-top:4px;opacity:.8}
+.pc{align-self:flex-start;display:flex;align-items:center;gap:10px;background:var(--teal-soft);border-radius:14px;padding:9px 12px;max-width:88%;animation:in .25s ease;text-align:left}
+.pc b{display:block;font-size:16px;color:var(--teal)}.pc span{font-size:13px;color:var(--muted)}
+.pc svg{width:18px;height:18px;color:var(--teal);flex:none}
+.score{font-size:40px;font-weight:800;color:var(--teal);line-height:1}
+.rep h4{margin:14px 0 4px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.rep ul{margin:0;padding-left:18px}.rep li{margin:3px 0;font-size:15px}
+.rep .fx{border-top:1px solid var(--line);padding:8px 0}.rep .fx s{color:var(--muted);font-size:14px}.rep .fx b{display:block;color:var(--ok)}.rep .fx span{font-size:13px;color:var(--muted)}
 /* review + settings */
 .flash{background:var(--card);border-radius:22px;box-shadow:var(--shadow);padding:28px 20px;text-align:center;min-height:220px;display:flex;flex-direction:column;justify-content:center;gap:10px}
 .flash .q{font-size:20px;font-weight:700}
@@ -188,6 +207,13 @@ input[type=range]{width:120px;accent-color:var(--accent)}
     <div class="sheet">
       <div id="chat"></div>
       <div id="sugg"></div>
+      <div class="callbar" id="callbar" hidden>
+        <button class="cb" id="muteBtn" aria-label="Couper le micro"></button>
+        <button class="cb" id="helpBtn" aria-label="Aide">Aide</button>
+        <div class="mid"><b id="timer">0:00</b><span id="callHint">Parle naturellement</span></div>
+        <button class="cb" id="kbBtn" aria-label="Écrire">Abc</button>
+        <button class="cb hang" id="hangBtn" aria-label="Raccrocher"></button>
+      </div>
       <div class="composer" id="composer" hidden>
         <button class="lang" id="langBtn" aria-label="Langue du micro">NL</button>
         <input id="txt" type="text" placeholder="Écris ou parle…" autocomplete="off" autocapitalize="sentences" enterkeyhint="send">
@@ -215,6 +241,8 @@ const ICON = {
   mic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',
   send: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
   stop: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>',
+  micOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 9v2a3 3 0 0 0 5 2.2M15 9.5V6a3 3 0 0 0-5.7-1.3M5 11a7 7 0 0 0 11.5 5.3M19 11a7 7 0 0 1-.6 2.8M12 18v3M3 3l18 18"/></svg>',
+  hang: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 9c-3.2 0-6.2.9-8.6 2.500-.9.6-1.200 1.800-.800 2.800l.8 1.900c.3.8 1.200 1.200 2 .9l2.600-.9c.7-.2 1.200-.900 1.200-1.700v-1.300c1.800-.5 3.800-.5 5.600 0v1.300c0 .8.5 1.500 1.200 1.700l2.600.9c.8.3 1.700-.1 2-.9l.8-1.900c.4-1 .1-2.200-.8-2.800C18.200 9.900 15.200 9 12 9z"/></svg>',
 };
 
 /* ---------- state ---------- */
@@ -287,34 +315,60 @@ function voiceFor(which) {
   pool.sort((a, b) => (NICE.test(b.name) - NICE.test(a.name)) || (prefs.indexOf(a.lang) < 0 ? 9 : prefs.indexOf(a.lang)) - (prefs.indexOf(b.lang) < 0 ? 9 : prefs.indexOf(b.lang)));
   return pool[0];
 }
-let speakRun = 0;
+let speakRun = 0, elOK = null, stopClip = null;
+const player = new Audio(), clips = new Map();
+// a few silent samples, played inside a tap so iOS lets later audio through
+const SILENCE = URL.createObjectURL(new Blob([Uint8Array.from(atob('UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQQAAAAAAAAA'), c => c.charCodeAt(0))], { type: 'audio/wav' }));
+function unlockAudio() {
+  try { player.src = SILENCE; player.play().catch(() => {}); } catch {}
+  if (synth) { try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; synth.speak(u); } catch {} }
+}
+async function clip(text, speed) {
+  const k = speed + '|' + text;
+  if (clips.has(k)) return clips.get(k);
+  if (elOK === false) return null;
+  try {
+    const r = await fetch('/api/speak', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, speed }) });
+    if (!r.ok) { if (r.status !== 429 && r.status < 500 || r.status === 501 || r.status === 503) elOK = false; return null; }
+    elOK = true;
+    const url = URL.createObjectURL(await r.blob());
+    clips.set(k, url); return url;
+  } catch { return null; }
+}
+const playClip = url => new Promise(res => {
+  const end = () => { player.onended = player.onerror = null; stopClip = null; res(); };
+  stopClip = () => { player.pause(); end(); };
+  player.onended = player.onerror = end; player.src = url; player.play().catch(end);
+});
+const synthSay = (it, slow) => new Promise(res => {
+  if (!synth) return res();
+  const u = new SpeechSynthesisUtterance(it.text), v = voiceFor(it.lang);
+  if (v) u.voice = v;
+  u.lang = v ? v.lang : C()[it.lang].voice[0];
+  u.rate = it.lang === 'target' ? (slow ? 0.6 : S.set.rate) : 1;
+  let fired = false;
+  const go = () => { if (!fired) { fired = true; clearTimeout(guard); res(); } };
+  // some browsers never fire onend; fall back to an estimate
+  const guard = setTimeout(go, 1500 + it.text.length * 110 / u.rate);
+  u.onend = go; u.onerror = go; synth.speak(u);
+});
 function setTalking(on) { $('#stage').classList.toggle('talking', on); if (on) $('#status').textContent = 'Parle'; else if (!$('#stage').classList.contains('thinking')) $('#status').textContent = 'À l\'écoute'; }
-function stopSpeaking() { speakRun++; if (synth) synth.cancel(); setTalking(false); }
+function stopSpeaking() { speakRun++; if (stopClip) stopClip(); if (synth) synth.cancel(); if (!(L && L.conv)) setTalking(false); }
 // items: [{lang:'target'|'native', text}], spoken one after the other
-function speak(items, slow) {
+async function speak(items, slow) {
   stopSpeaking();
-  if (!synth || !items.length) return Promise.resolve();
+  if (!items.length || (L && L.conv)) return;
   const run = ++speakRun;
   stopListening();
-  return new Promise(done => {
-    let i = 0;
-    const next = () => {
-      if (run !== speakRun) return done();
-      if (i >= items.length) { setTalking(false); return done(); }
-      const it = items[i++], u = new SpeechSynthesisUtterance(it.text), v = voiceFor(it.lang);
-      if (v) u.voice = v;
-      u.lang = v ? v.lang : C()[it.lang].voice[0];
-      u.rate = it.lang === 'target' ? (slow ? 0.6 : S.set.rate) : 1;
-      let fired = false;
-      const go = () => { if (!fired) { fired = true; clearTimeout(guard); next(); } };
-      // some browsers never fire onend; fall back to an estimate
-      const guard = setTimeout(go, 1500 + it.text.length * 110 / u.rate);
-      u.onend = go; u.onerror = go;
-      setTalking(true);
-      synth.speak(u);
-    };
-    next();
-  });
+  for (const it of items) {
+    const speed = it.lang === 'target' ? (slow ? 0.75 : Math.min(1.2, Math.max(0.7, S.set.rate + 0.1))) : 1;
+    const url = await clip(it.text, speed);
+    if (run !== speakRun) return;
+    setTalking(true);
+    await (url ? playClip(url) : synthSay(it, slow));
+    if (run !== speakRun) return;
+  }
+  setTalking(false);
 }
 
 /* ---------- speech in ---------- */
@@ -353,6 +407,7 @@ $('#micBtn').addEventListener('click', () => {
   if (listening) return stopListening();
   const t = $('#txt').value.trim();
   if (t) return submit(t);
+  if (L && L.conv) return;
   startListening();
 });
 $('#txt').addEventListener('input', paintMic);
@@ -367,27 +422,31 @@ function add(html, cls) { const d = document.createElement('div'); d.className =
 
 function openLesson(d) {
   const info = dayInfo(d);
-  L = { info, history: [], turns: 0, mode: 'ai', step: 0, expect: null, complete: false, learned: [], busy: false, started: false };
+  L = { info, history: [], turns: 0, mode: 'ai', step: 0, expect: null, complete: false, learned: [], busy: false, started: false, conv: null, log: [], fixes: [], t0: 0, reported: false };
+  loadSDK();
   micLang = 'target';
   chat.innerHTML = ''; $('#sugg').innerHTML = ''; $('#txt').value = '';
-  $('#composer').hidden = true; $('#endBtn').hidden = true;
+  $('#composer').hidden = true; $('#endBtn').hidden = true; $('#callbar').hidden = true; $('#lesson').classList.remove('call');
   $('#dayPill').textContent = `Jour ${d} · ${info.level}`;
   $('#tutorName').textContent = C().tutor;
   show('lesson');
   for (const v of [$('#vIdle'), $('#vTalk')]) v.play().catch(() => {});
   add(`<h3>${esc(info.title)}</h3><p class="sub">${esc(info.focus)}. ${esc(info.scenario)}</p>
     ${info.phrases.map((p, i) => `<button class="ph" data-say="${i}"><div><b>${esc(p.target)}</b><span>${esc(p.native)}</span></div>${ICON.spk}</button>`).join('')}
-    <button class="btn block" id="startBtn" style="margin-top:14px">Parler avec ${esc(C().tutor)}</button>`, 'card');
+    <button class="btn block" id="startBtn" style="margin-top:14px">Appeler ${esc(C().tutor)}</button>`, 'card');
   paintMic();
 }
-function closeLesson() { stopSpeaking(); stopListening(); for (const v of [$('#vIdle'), $('#vTalk')]) v.pause(); L = null; show('home'); }
+function closeLesson() { if (L && L.conv) { const c = L.conv; L.conv = null; c.endSession().catch(() => {}); } clearInterval(tick); releaseWake(); stopSpeaking(); stopListening(); for (const v of [$('#vIdle'), $('#vTalk')]) v.pause(); L = null; show('home'); }
 $('#backBtn').addEventListener('click', closeLesson);
 $('#endBtn').addEventListener('click', () => finish());
 
 chat.addEventListener('click', e => {
   if (!L) return;
   const say = e.target.closest('[data-say]');
-  if (say) return speak([{ lang: 'target', text: L.info.phrases[+say.dataset.say].target }]);
+  if (say) { unlockAudio(); return speak([{ lang: 'target', text: L.info.phrases[+say.dataset.say].target }]); }
+  if (e.target.closest('#againBtn')) return openLesson(L.info.n);
+  const pc = e.target.closest('.pc'); if (pc) return speak([{ lang: 'target', text: pc.dataset.t }]);
+  const tap = e.target.closest('.msg.her.tap'); if (tap) return translate(tap);
   if (e.target.closest('#startBtn')) { e.target.closest('#startBtn').remove(); return begin(); }
   if (e.target.closest('#doneBtn')) return finish();
   const slow = e.target.closest('[data-slow]'), seg = e.target.closest('[data-t]');
@@ -399,13 +458,144 @@ $('#sugg').addEventListener('click', e => {
   speak([{ lang: 'target', text: b.dataset.t }]);
 });
 
-function begin() {
-  L.started = true; $('#composer').hidden = false;
-  // unlock audio on iOS with a silent utterance inside the tap
-  if (synth) { try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; synth.speak(u); } catch {} }
+/* ----- live voice call ----- */
+let sdk = null, tick = null, wake = null;
+function loadSDK() {
+  return sdk || (sdk = new Promise(res => {
+    if (window.ElevenLabsClient) return res(true);
+    const el = document.createElement('script'); el.src = '/vendor/elevenlabs-client.js';
+    el.onload = () => res(!!window.ElevenLabsClient); el.onerror = () => { sdk = null; res(false); };
+    document.head.appendChild(el);
+  }));
+}
+const releaseWake = () => { if (wake) { wake.release().catch(() => {}); wake = null; } };
+const balance = d => d <= 15 ? 'Speak mostly French, like a friend who happens to be a teacher. Every turn contains one or two short Dutch phrases for the learner to hear and say. Go slowly.'
+  : d <= 30 ? 'About half French, half Dutch. Small talk and questions in simple Dutch, explanations and help in French.'
+  : d <= 45 ? 'Mostly Dutch, in short sentences. Use French only for a quick explanation or when the learner is stuck.'
+  : d <= 60 ? 'Dutch only, simple and clear. Switch to French for one sentence only if the learner is truly lost.'
+  : 'Dutch only, at natural speed, with natural everyday phrasing. French only if the learner explicitly asks for it.';
+const greeting = (d, t) => d === 1 ? 'Hallo ! Moi c\'est Sanne, ta prof de néerlandais. Ravie de te rencontrer ! Dis-moi, comment tu t\'appelles ?'
+  : d <= 15 ? `Hallo ! C'est Sanne. Contente de te retrouver. Aujourd'hui, on voit ensemble: ${t.toLowerCase()}. Ça te va ?`
+  : d <= 30 ? 'Hallo! Hoe gaat het? Tu as passé une bonne journée ?'
+  : d <= 60 ? 'Hoi! Leuk je weer te zien. Hoe gaat het met je vandaag?'
+  : 'Hé, hallo! Hoe is het? Vertel, wat heb je vandaag gedaan?';
+
+async function startCall() {
+  const mine = L, i = L.info;
+  $('#status').textContent = 'Appel en cours';
+  const [ok, r] = await Promise.all([loadSDK(), fetch('/api/session', { method: 'POST' })]);
+  if (!ok || !r.ok) throw new Error('unavailable');
+  const { token, signedUrl } = await r.json();
+  const opts = {
+    dynamicVariables: { day: String(i.n), level: i.level, lesson_title: i.title, focus: i.focus, scenario: i.scenario,
+      phrases: i.phrases.map(p => `- ${p.target} = ${p.native}`).join('\n'), balance: balance(i.n), greeting: greeting(i.n, i.title) },
+    clientTools: {
+      show_phrase: ({ dutch, french }) => { if (L === mine && dutch) { learn({ target: dutch, native: french || '' }); add(`${ICON.spk}<div><b>${esc(dutch)}</b><span>${esc(french)}</span></div>`, 'pc').dataset.t = dutch; } },
+      show_correction: ({ said, correct, why }) => { if (L === mine && correct) { L.fixes.push({ said, correct, why }); add(`<h4>Petite correction</h4><s>${esc(said)}</s><div class="good">${esc(correct)}</div><p>${esc(why)}</p>`, 'fix'); } },
+      lesson_done: ({ praise }) => { if (L === mine) { L.complete = true; L.praise = praise || ''; } },
+    },
+    onMessage: m => {
+      if (L !== mine || !m || !m.message) return;
+      const me = m.source === 'user' || m.role === 'user';
+      L.log.push({ role: me ? 'user' : 'tutor', text: m.message });
+      if (me) { L.turns++; add(esc(m.message), 'msg me'); }
+      else add(`<div>${esc(m.message)}</div><div class="hint">Touche pour traduire</div>`, 'msg her tap').dataset.x = m.message;
+    },
+    onModeChange: ({ mode }) => {
+      if (L !== mine) return;
+      const talking = mode === 'speaking';
+      $('#stage').classList.toggle('talking', talking);
+      $('#status').textContent = talking ? 'Parle' : 'Je t\'écoute';
+      if (!talking && L.complete) setTimeout(() => { if (L === mine && L.conv) endCall(); }, 1500);
+    },
+    onDisconnect: () => { if (L === mine && L.conv) { L.conv = null; afterCall(); } },
+    onError: () => {},
+  };
+  const C2 = window.ElevenLabsClient.Conversation;
+  let conv;
+  try { if (!token) throw new Error('no token'); conv = await C2.startSession({ conversationToken: token, connectionType: 'webrtc', ...opts }); }
+  catch (e) { if (!signedUrl || (e && e.name === 'NotAllowedError')) throw e; conv = await C2.startSession({ signedUrl, connectionType: 'websocket', ...opts }); }
+  if (L !== mine) { conv.endSession().catch(() => {}); return; }
+  L.conv = conv; L.mode = 'call'; L.t0 = Date.now(); L.muted = false;
+  $('#lesson').classList.add('call'); $('#callbar').hidden = false; $('#status').textContent = 'En ligne'; paintCall();
+  clearInterval(tick);
+  tick = setInterval(() => { const t = Math.floor((Date.now() - mine.t0) / 1000); $('#timer').textContent = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; }, 1000);
+  try { wake = await navigator.wakeLock?.request('screen'); } catch {}
+}
+function learn(p) { if (p.target && !L.learned.some(x => x.target === p.target)) L.learned.push(p); }
+function paintCall() {
+  const m = $('#muteBtn'); m.innerHTML = L && L.muted ? ICON.micOff : ICON.mic; m.classList.toggle('off', !!(L && L.muted));
+  $('#hangBtn').innerHTML = ICON.hang;
+  $('#callHint').textContent = L && L.muted ? 'Micro coupé' : 'Parle naturellement';
+}
+async function endCall() {
+  if (!L || !L.conv) return;
+  const c = L.conv; L.conv = null;
+  try { await c.endSession(); } catch {}
+  afterCall();
+}
+async function afterCall() {
+  if (!L || L.reported) return;
+  L.reported = true; const mine = L, i = L.info;
+  clearInterval(tick); releaseWake();
+  $('#callbar').hidden = true; $('#composer').hidden = true; $('#lesson').classList.remove('call');
+  $('#stage').classList.remove('talking'); $('#status').textContent = 'Appel terminé';
+  const said = L.log.filter(m => m.role === 'user').length;
+  if (said < 2) return add(`<h3>Appel terminé</h3><p class="sub">L'appel a été trop court pour valider la leçon.</p><button class="btn block" id="againBtn">Rappeler ${esc(C().tutor)}</button>`, 'card');
+  const card = add(`<h3>Bilan de l'appel</h3><p class="sub">${esc(C().tutor)} prépare ton retour…</p><div class="typing"><i></i><i></i><i></i></div>`, 'card rep');
+  let rep = null;
+  try {
+    const r = await fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+      day: i.n, level: i.level, title: i.title, targetName: C().target.name, nativeName: C().native.name, transcript: L.log }) });
+    if (r.ok) rep = await r.json();
+  } catch {}
+  if (L !== mine) return;
+  if (!rep) rep = { summary: L.praise || 'Bel appel. Voici ce que tu as travaillé.', strengths: [], corrections: L.fixes, phrases: [], next_tip: '', score: null };
+  for (const p of rep.phrases || []) learn(p);
+  const mins = Math.max(1, Math.round((Date.now() - L.t0) / 60000));
+  card.innerHTML = `<div style="display:flex;align-items:flex-end;gap:12px;justify-content:space-between"><div><h3>Bilan de l'appel</h3><p class="sub" style="margin:0">${mins} min de conversation · ${said} prises de parole</p></div>${rep.score != null ? `<div class="score">${Math.round(rep.score)}</div>` : ''}</div>
+    <p style="margin:12px 0 0">${esc(rep.summary)}</p>
+    ${rep.strengths?.length ? `<h4>Ce que tu as bien fait</h4><ul>${rep.strengths.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+    ${rep.corrections?.length ? `<h4>À corriger</h4>${rep.corrections.map(f => `<div class="fx"><s>${esc(f.said)}</s><b>${esc(f.correct)}</b><span>${esc(f.why)}</span></div>`).join('')}` : ''}
+    ${L.learned.length ? `<h4>Phrases à retenir</h4>${L.learned.slice(0, 10).map(p => `<div class="fx"><b style="color:var(--teal)">${esc(p.target)}</b><span>${esc(p.native)}</span></div>`).join('')}` : ''}
+    ${rep.next_tip ? `<h4>Pour la prochaine fois</h4><p style="margin:0">${esc(rep.next_tip)}</p>` : ''}
+    <button class="btn block teal" id="doneBtn" style="margin-top:16px">Valider le jour ${i.n}</button>
+    <button class="btn block ghost" id="againBtn" style="margin-top:8px">Refaire l'appel</button>`;
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+async function translate(el) {
+  if (el.querySelector('.tr')) return el.querySelector('.tr').remove();
+  const h = el.querySelector('.hint'); if (h) h.textContent = 'Traduction…';
+  let t = '';
+  try {
+    const r = await fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ translate: el.dataset.x, targetName: C().target.name, nativeName: C().native.name }) });
+    if (r.ok) t = (await r.json()).translation;
+  } catch {}
+  if (h) h.remove();
+  if (!t) return toast('Traduction indisponible');
+  const d = document.createElement('div'); d.className = 'tr'; d.textContent = t; el.appendChild(d); scrollDown();
+}
+$('#muteBtn').addEventListener('click', () => { if (!L || !L.conv) return; L.muted = !L.muted; try { L.conv.setMicMuted(L.muted); } catch {} paintCall(); });
+$('#hangBtn').addEventListener('click', endCall);
+$('#helpBtn').addEventListener('click', () => { if (L && L.conv) { try { L.conv.sendUserMessage('Je suis bloqué. Aide-moi: donne-moi la phrase à dire en néerlandais, lentement, avec sa traduction.'); } catch {} toast('Sanne va t\'aider'); } });
+$('#kbBtn').addEventListener('click', () => { const c = $('#composer'); c.hidden = !c.hidden; if (!c.hidden) $('#txt').focus(); });
+
+async function begin() {
+  const mine = L;
+  L.started = true; unlockAudio();
+  add('Appel en cours…', 'note').id = 'ringing';
+  try { await startCall(); document.getElementById('ringing')?.remove(); return; }
+  catch (e) {
+    if (L !== mine) return;
+    document.getElementById('ringing')?.remove();
+    const denied = e && (e.name === 'NotAllowedError' || /permission|denied/i.test(e.message || ''));
+    add(denied ? 'Micro refusé. Autorise le micro pour appeler Sanne. En attendant, voici le mode texte.' : 'Appel vocal indisponible pour le moment. Voici le mode texte.', 'note');
+  }
+  L.mode = 'ai'; $('#composer').hidden = false;
   turn('[START]', true);
 }
 function submit(text) {
+  if (L && L.conv) { $('#txt').value = ''; paintMic(); L.log.push({ role: 'user', text }); L.turns++; add(esc(text), 'msg me'); try { L.conv.sendUserMessage(text); } catch {} return; }
   if (!L || !L.started || L.busy || L.complete) return;
   stopSpeaking();
   $('#txt').value = ''; paintMic();
@@ -542,6 +732,7 @@ $('#reviewBody').addEventListener('click', e => {
   if (e.target.closest('#allBtn')) { R = { q: S.cards.slice().sort(() => Math.random() - .5).slice(0, 20), open: false }; return renderReview(); }
   const b = e.target.closest('[data-r]'); if (!b || !R) return;
   const c = R.q[0], a = b.dataset.r;
+  unlockAudio();
   if (a === 'open') { R.open = true; speak([{ lang: 'target', text: c.t }]); }
   else if (a === 'say') speak([{ lang: 'target', text: c.t }]);
   else {
@@ -561,13 +752,14 @@ function renderSettings() {
     <div class="set"><div><b>Vitesse de la voix</b><span>Ralentis au début, accélère ensuite.</span></div><input type="range" id="rate" min="0.6" max="1.1" step="0.05" value="${s.rate}"></div>
     <div class="set"><div><b>Afficher les traductions</b><span>Désactive pour deviner avant de toucher la phrase.</span></div><button class="sw ${s.showTr ? 'on' : ''}" data-k="showTr" aria-label="Traductions"></button></div>
     <div class="set"><div><b>Débloquer tous les jours</b><span>Pour choisir librement dans le programme.</span></div><button class="sw ${s.unlockAll ? 'on' : ''}" data-k="unlockAll" aria-label="Débloquer"></button></div>
-    <div class="set"><div><b>Tester la voix</b><span>${voiceFor('target') ? esc(voiceFor('target').name) : 'Aucune voix ' + esc(c.target.name) + ' trouvée sur cet appareil.'}</span></div><button class="btn ghost" id="testVoice">Écouter</button></div>
+    <div class="set"><div><b>Tester la voix</b><span>La voix de ${esc(c.tutor)}, en ${esc(c.target.name)} puis en ${esc(c.native.name)}.</span></div><button class="btn ghost" id="testVoice">Écouter</button></div>
   </div>
   <button class="btn ghost block" id="reset" style="margin-top:16px;color:#b42318">Remettre ma progression à zéro</button>`;
 }
 $('#settingsBody').addEventListener('click', e => {
   const sw = e.target.closest('.sw');
   if (sw) { S.set[sw.dataset.k] = !S.set[sw.dataset.k]; save(); return renderSettings(); }
+  if (e.target.closest('#testVoice')) unlockAudio();
   if (e.target.closest('#testVoice')) return speak([{ lang: 'target', text: C().days[0][3][2][0] }, { lang: 'native', text: C().days[0][3][2][1] }]);
   if (e.target.closest('#reset') && confirm('Effacer toute ta progression ?')) { S = structuredClone(DEF); save(); R = null; renderSettings(); toast('Progression effacée'); }
 });

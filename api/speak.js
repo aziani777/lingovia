@@ -1,0 +1,25 @@
+// Speaks one short phrase with the tutor's voice. Used for phrase cards and revisions.
+const API = 'https://api.elevenlabs.io';
+const VOICE = process.env.ELEVENLABS_VOICE_ID || 'OlBRrVAItyi00MuGMbna';
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const key = process.env.ELEVENLABS_API_KEY;
+  if (!key) return res.status(503).json({ error: 'no_key' });
+  const text = String(req.body?.text ?? '').trim().slice(0, 400);
+  if (!text) return res.status(400).json({ error: 'Empty text' });
+  const speed = Math.min(1.2, Math.max(0.7, Number(req.body?.speed) || 1));
+  try {
+    const r = await fetch(`${API}/v1/text-to-speech/${VOICE}?output_format=mp3_44100_64`, {
+      method: 'POST',
+      headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, model_id: 'eleven_flash_v2_5', voice_settings: { speed } }),
+    });
+    if (!r.ok) return res.status(r.status).json({ error: (await r.text()).slice(0, 300) });
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.status(200).send(Buffer.from(await r.arrayBuffer()));
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+}

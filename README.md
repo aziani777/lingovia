@@ -7,17 +7,24 @@ Premier cours: néerlandais depuis le français.
 
 - `index.html` : l'app mobile (PWA installable), sans étape de build
 - `curriculum.js` : le programme de 90 jours. Ajouter une langue = ajouter une clé `"<cible>-<natif>"`
-- `api/tutor.js` : la prof (Claude), qui répond, traduit et corrige
+- `api/session.js`, `api/speak.js` : appel vocal et voix (ElevenLabs)
+- `api/feedback.js` : bilan de fin d'appel et traduction (Claude)
+- `api/tutor.js` : mode texte de secours (Claude)
+- `elevenlabs/` : configuration de l'agent vocal
+- `vendor/elevenlabs-client.js` : SDK navigateur ElevenLabs 1.37.1
 - `assets/` : portrait et boucles vidéo de l'avatar
 
 ## Déployer sur Vercel
 
 1. Importer ce dépôt dans Vercel (aucun réglage de build)
-2. Ajouter la variable d'environnement `ANTHROPIC_API_KEY`
-3. Optionnel: `LINGOVIA_MODEL` pour changer de modèle (défaut `claude-opus-5-5`)
+2. Ajouter les variables d'environnement:
+   - `ELEVENLABS_API_KEY` : l'appel vocal en temps réel et la voix de la prof
+   - `ANTHROPIC_API_KEY` : le bilan de fin d'appel, la traduction au toucher et le mode texte
+3. Optionnel: `ELEVENLABS_AGENT_ID`, `ELEVENLABS_VOICE_ID`, `LINGOVIA_MODEL`, `LINGOVIA_FAST_MODEL`
 
-Sans clé, l'app fonctionne en mode entraînement guidé (répéter puis traduire les phrases du jour).
+## Comment ça marche
 
-## Voix
-
-La voix et le micro utilisent le navigateur (Web Speech API). Chrome sur Android et Safari sur iPhone fournissent une voix néerlandaise.
+- L'appel est une conversation vocale en direct avec un agent ElevenLabs (`api/session.js` délivre un jeton par appel). On peut couper la parole à la prof, le micro reste ouvert.
+- La personnalité et la méthode de la prof sont dans `elevenlabs/prompt.md`. Après modification: `ELEVENLABS_API_KEY=... python3 elevenlabs/setup.py <agent_id>`.
+- La leçon du jour est transmise à l'agent sous forme de variables au début de chaque appel.
+- Sans clé ElevenLabs, l'app bascule en mode texte. Sans aucune clé, en mode entraînement guidé.
