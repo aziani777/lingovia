@@ -399,7 +399,7 @@ const face = (() => {
       try { f = L.conv.getOutputByteFrequencyData(); } catch {}
       try { v = L.conv.getOutputVolume() || 0; } catch {}
     } else if (api.fake) {
-      v = 0.5 + 0.5 * Math.sin(t / 55) * Math.sin(t / 131); return [v < 0.42 ? 0 : v, -1];
+      v = 0.5 + 0.5 * Math.sin(t / 95) * Math.sin(t / 240); return [v < 0.42 ? 0 : v, -1];
     } else if (analyser && !player.paused) {
       if (!fbuf) fbuf = new Uint8Array(analyser.frequencyBinCount);
       analyser.getByteFrequencyData(fbuf); f = fbuf;
@@ -420,9 +420,9 @@ const face = (() => {
     const [v, c] = listen(t);
     // loudness: slow auto-gain, a little lead to make up for the analyser's smoothing
     peak = Math.max(v, peak * 0.9985, 0.03);
-    const lead = Math.max(0, v + (v - prev) * 1.5); prev = v;
+    const lead = Math.max(0, v + (v - prev) * 0.8); prev = v;
     const target = Math.min(1, Math.max(0, (lead / peak - 0.14) / 0.72));
-    open += (target - open) * (target > open ? 0.6 : 0.3);
+    open += (target - open) * (target > open ? 0.34 : 0.16);
     // lip shape: dull sounds (o, u) round the lips, bright sounds (e, i, s) stretch them
     const isOpen = open > 0.18;
     if (c >= 0 && v > peak * 0.2) {
@@ -430,10 +430,10 @@ const face = (() => {
       if (cHi - cLo > 1) shapeTo = Math.min(2, Math.max(0, (c - cLo) / (cHi - cLo) * 2.4 - 0.2));
     } else if (c < 0 && isOpen && !wasOpen) shapeTo = Math.random() * 2; // no spectrum: vary per syllable
     wasOpen = isOpen;
-    shape += (shapeTo - shape) * 0.22;
+    shape += (shapeTo - shape) * 0.09;
 
     g.globalAlpha = 1; g.drawImage(base, 0, 0, 640, 640);
-    const f = Math.pow(open, 0.8) * (M.n - 1) * 0.9, k0 = Math.floor(f), k1 = Math.min(M.n - 1, k0 + 1), a = f - k0;
+    const f = Math.pow(open, 0.9) * (M.n - 1) * 0.72, k0 = Math.floor(f), k1 = Math.min(M.n - 1, k0 + 1), a = f - k0;
     const r0 = Math.min(M.rows - 1, Math.floor(shape)), r1 = Math.min(M.rows - 1, r0 + 1), rb = shape - r0;
     row(r0, k0, k1, a, g, M.x, M.y);
     if (rb > 0.03 && r1 !== r0) { row(r1, k0, k1, a, tg, 0, 0); g.globalAlpha = rb; g.drawImage(tmp, M.x, M.y); g.globalAlpha = 1; }
@@ -444,8 +444,8 @@ const face = (() => {
     }
     // a little head movement while she talks, eased in and out
     live += (($('#stage').classList.contains('talking') ? 1 : 0) - live) * 0.06;
-    const x = (Math.sin(t / 2300) * 3 + Math.sin(t / 870) * 1.2) * live, y = (Math.sin(t / 3100 + 1) * 2 + open * 1.6) * live;
-    const rot = (Math.sin(t / 2900 + 2) * 0.45 + Math.sin(t / 1100) * 0.15) * live;
+    const x = (Math.sin(t / 3900) * 2.4 + Math.sin(t / 1700) * 0.6) * live, y = (Math.sin(t / 4700 + 1) * 1.6 + open * 0.8) * live;
+    const rot = (Math.sin(t / 5300 + 2) * 0.35) * live;
     cv.style.transform = `translate(${x.toFixed(2)}px,${y.toFixed(2)}px) rotate(${rot.toFixed(3)}deg) scale(1.035)`;
   }
   function start() { if (!raf) { nextBlink = performance.now() + 1500; raf = requestAnimationFrame(frame); } }
