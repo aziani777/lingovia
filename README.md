@@ -12,6 +12,8 @@ Premier cours: néerlandais depuis le français.
 - `api/tutor.js` : mode texte de secours (Claude)
 - `elevenlabs/` : configuration de l'agent vocal
 - `vendor/elevenlabs-client.js` : SDK navigateur ElevenLabs 1.37.1
+- `vendor/headaudio/` : HeadAudio 1.1.0 (MIT), détection des sons pour la synchro des lèvres
+- `tools/build-face.py` : extrait les positions de bouche et de clignement depuis les vidéos de l'avatar
 - `assets/` : portrait et boucles vidéo de l'avatar
 
 ## Déployer sur Vercel
