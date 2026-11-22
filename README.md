@@ -13,6 +13,8 @@ Premier cours: néerlandais depuis le français.
 - `elevenlabs/` : configuration de l'agent vocal
 - `vendor/elevenlabs-client.js` : SDK navigateur ElevenLabs 1.37.1
 - `vendor/headaudio/` : HeadAudio 1.1.0 (MIT), détection des sons pour la synchro des lèvres
+- `vendor/talkinghead/`, `vendor/three/` : TalkingHead 1.8.2 et three.js 0.187 (MIT), avatar 3D
+- `assets/avatars/tutor.glb` : modèle 3D d'exemple de TalkingHead, créé sur Ready Player Me, licence CC BY-NC 4.0 (usage non commercial uniquement)
 - `tools/build-face.py` : extrait les positions de bouche et de clignement depuis les vidéos de l'avatar
 - `assets/` : portrait et boucles vidéo de l'avatar
 

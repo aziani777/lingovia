@@ -9,6 +9,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="manifest" href="/manifest.webmanifest">
+<script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script>
 <link rel="icon" href="/icon-192.png">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <style>
@@ -77,6 +78,9 @@ h1,h2,h3{margin:0;line-height:1.15;letter-spacing:-.01em}
 .stage #face{opacity:0;transition:opacity .18s}
 .stage.talking #face{opacity:1}
 .stage video,.stage>img{transform:scale(1.035)}
+.stage #av3d{position:absolute;inset:0;opacity:0;pointer-events:none;transition:opacity .35s;overflow:hidden;background:radial-gradient(120% 90% at 50% 35%,#f7efe2 0%,#e7ddcb 45%,#b9cfc9 100%)}
+.stage #av3d canvas{position:absolute;inset:0;width:100%!important;height:100%!important;object-fit:contain}
+.stage.three #av3d{opacity:1}
 .stage::after{z-index:1;content:"";position:absolute;inset:auto 0 0 0;height:120px;background:linear-gradient(transparent,rgba(0,0,0,.65));pointer-events:none}
 .stage .hud{position:absolute;left:0;right:0;top:0;padding:calc(10px + var(--safe-t)) 12px 0;display:flex;gap:8px;align-items:center;z-index:2}
 .pill{background:rgba(0,0,0,.45);color:#fff;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:99px;padding:8px 12px;font-size:13px;font-weight:700;min-height:36px;display:inline-flex;align-items:center;gap:6px}
@@ -198,6 +202,7 @@ input[type=range]{width:120px;accent-color:var(--accent)}
       <img src="/assets/avatar.jpg" alt="">
       <video id="vIdle" src="/assets/idle.mp4" poster="/assets/avatar.jpg" muted loop playsinline preload="auto"></video>
       <canvas id="face" width="640" height="640"></canvas>
+      <div id="av3d"></div>
       <div class="hud">
         <button class="pill" id="backBtn" aria-label="Retour">‹ Parcours</button>
         <span class="pill" id="dayPill" style="margin-left:auto"></span>
@@ -248,7 +253,7 @@ const ICON = {
 
 /* ---------- state ---------- */
 const KEY = 'lingovia.v1';
-const DEF = { pair: 'nl-fr', done: {}, streak: 0, last: '', cards: [], set: { rate: 0.85, showTr: true, unlockAll: false } };
+const DEF = { pair: 'nl-fr', done: {}, streak: 0, last: '', cards: [], set: { rate: 0.85, showTr: true, unlockAll: false, three: true } };
 let S;
 try { S = Object.assign({}, DEF, JSON.parse(localStorage.getItem(KEY) || '{}')); S.set = Object.assign({}, DEF.set, S.set); }
 catch { S = structuredClone(DEF); }
@@ -381,6 +386,32 @@ async function speak(items, slow) {
   setTalking(false);
 }
 
+/* ---------- 3D avatar (TalkingHead, MIT) ---------- */
+const av3d = (() => {
+  let head = null, loading = null, lastEnd = 0;
+  const on = () => !!head && $('#stage').classList.contains('three');
+  function load() {
+    return loading || (loading = (async () => {
+      const { TalkingHead } = await import('/vendor/talkinghead/talkinghead.mjs');
+      const h = new TalkingHead($('#av3d'), { ttsEndpoint: null, lipsyncModules: [], cameraView: 'head', cameraDistance: 0.4, cameraY: 0.09, cameraRotateEnable: false,
+        modelFPS: 30, modelPixelRatio: Math.min(2, window.devicePixelRatio || 1), avatarMood: 'happy',
+        avatarIdleEyeContact: 0.6, avatarSpeakingEyeContact: 0.8, avatarSpeakingHeadMove: 0.6, lightAmbientIntensity: 2, lightDirectIntensity: 20 });
+      await h.showAvatar({ url: '/assets/avatars/tutor.glb', body: 'F', avatarMood: 'happy', lipsyncLang: 'en' });
+      head = h; return true;
+    })().catch(() => { loading = null; head = null; return false; }));
+  }
+  async function show() {
+    if (!S.set.three) return hide();
+    if (await load()) { try { head.start(); } catch {} $('#stage').classList.add('three'); }
+  }
+  function hide() { $('#stage').classList.remove('three'); if (head) { try { head.stop(); } catch {} } }
+  function set(k, v) { if (!on()) return; const m = head.mtAvatar && head.mtAvatar[k]; if (m) { m.newvalue = v; m.needsUpdate = true; } }
+  // a new sentence: look at the learner and gesture, like a person starting to talk
+  function sentence() { if (!on()) return; if (Date.now() - lastEnd > 400) { try { head.lookAtCamera(600); head.speakWithHands(); } catch {} } }
+  function ended() { lastEnd = Date.now(); }
+  return { show, hide, set, sentence, ended, on, get head() { return head; }, peek: k => head && head.mtAvatar && head.mtAvatar[k] ? head.mtAvatar[k].value : null };
+})();
+
 /* ---------- face: mouth shapes driven by the voice ---------- */
 const face = (() => {
   // sprite sheet: 3 rows (rounded, neutral, wide lips) x 6 columns (closed to open)
@@ -410,7 +441,8 @@ const face = (() => {
         const node = new HeadAudio(ctx, { visemeMinMs: 100, visemeRampMs: 110, parameterData: { vadGateActiveDb: -40, vadGateInactiveDb: -60 } });
         await node.loadModel('/vendor/headaudio/model-en-mixed.bin');
         h = { node, w: {}, an: new WeakSet() };
-        node.onvalue = (k, v) => { h.w[k] = v; };
+        node.onvalue = (k, v) => { h.w[k] = v; av3d.set(k, v); };
+        node.onstarted = () => av3d.sentence(); node.onended = () => av3d.ended();
         heads.set(ctx, h);
       }
       if (!h.an.has(an)) { an.connect(h.node); h.an.add(an); }
@@ -457,6 +489,10 @@ const face = (() => {
     const dt = Math.min(100, lastT ? t - lastT : 16); lastT = t;
     const [v, c] = listen(t);
     const heard = !api.fake && visemes(dt);
+    if (av3d.on()) {                      // 3D avatar is showing: nothing to draw here
+      if (!heard) { peak = Math.max(v, peak * 0.9985, 0.03); const o = Math.min(1, Math.max(0, (v / peak - 0.14) / 0.72)); open += (o - open) * 0.3; av3d.set('viseme_aa', open * 0.55); }
+      return;
+    }
     // loudness: slow auto-gain, a little lead to make up for the analyser's smoothing
     peak = Math.max(v, peak * 0.9985, 0.03);
     const lead = Math.max(0, v + (v - prev) * 0.8); prev = v;
@@ -553,13 +589,13 @@ function openLesson(d) {
   $('#dayPill').textContent = `Jour ${d} · ${info.level}`;
   $('#tutorName').textContent = C().tutor;
   show('lesson');
-  $('#vIdle').play().catch(() => {}); face.start();
+  $('#vIdle').play().catch(() => {}); face.start(); av3d.show();
   add(`<h3>${esc(info.title)}</h3><p class="sub">${esc(info.focus)}. ${esc(info.scenario)}</p>
     ${info.phrases.map((p, i) => `<button class="ph" data-say="${i}"><div><b>${esc(p.target)}</b><span>${esc(p.native)}</span></div>${ICON.spk}</button>`).join('')}
     <button class="btn block" id="startBtn" style="margin-top:14px">Appeler ${esc(C().tutor)}</button>`, 'card');
   paintMic();
 }
-function closeLesson() { if (L && L.conv) { const c = L.conv; L.conv = null; c.endSession().catch(() => {}); } clearInterval(tick); releaseWake(); stopSpeaking(); stopListening(); $('#vIdle').pause(); face.stop(); L = null; show('home'); }
+function closeLesson() { if (L && L.conv) { const c = L.conv; L.conv = null; c.endSession().catch(() => {}); } clearInterval(tick); releaseWake(); stopSpeaking(); stopListening(); $('#vIdle').pause(); face.stop(); av3d.hide(); L = null; show('home'); }
 $('#backBtn').addEventListener('click', closeLesson);
 $('#endBtn').addEventListener('click', () => finish());
 
@@ -877,6 +913,7 @@ function renderSettings() {
     <div class="set"><div><b>Cours</b><span>${esc(c.target.name)} depuis le ${esc(c.native.name)}. D'autres langues arrivent.</span></div></div>
     <div class="set"><div><b>Vitesse de la voix</b><span>Ralentis au début, accélère ensuite.</span></div><input type="range" id="rate" min="0.6" max="1.1" step="0.05" value="${s.rate}"></div>
     <div class="set"><div><b>Afficher les traductions</b><span>Désactive pour deviner avant de toucher la phrase.</span></div><button class="sw ${s.showTr ? 'on' : ''}" data-k="showTr" aria-label="Traductions"></button></div>
+    <div class="set"><div><b>Avatar 3D</b><span>Personnage animé avec lèvres synchronisées. Désactive pour revenir à la photo.</span></div><button class="sw ${s.three ? 'on' : ''}" data-k="three" aria-label="Avatar 3D"></button></div>
     <div class="set"><div><b>Débloquer tous les jours</b><span>Pour choisir librement dans le programme.</span></div><button class="sw ${s.unlockAll ? 'on' : ''}" data-k="unlockAll" aria-label="Débloquer"></button></div>
     <div class="set"><div><b>Tester la voix</b><span>La voix de ${esc(c.tutor)}, en ${esc(c.target.name)} puis en ${esc(c.native.name)}.</span></div><button class="btn ghost" id="testVoice">Écouter</button></div>
   </div>
@@ -894,7 +931,7 @@ $('#settingsBody').addEventListener('change', e => { if (e.target.id === 'rate')
 /* ---------- boot ---------- */
 renderHome();
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('/sw.js').catch(() => {});
-window.__lingovia = { get S() { return S; }, get L() { return L; }, face };
+window.__lingovia = { get S() { return S; }, get L() { return L; }, face, av3d };
 })();
 </script>
 </body>
