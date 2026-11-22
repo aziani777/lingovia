@@ -1,6 +1,6 @@
-const CACHE = 'lingovia-v2';
+const CACHE = 'lingovia-v3';
 const SHELL = ['/', '/index.html', '/curriculum.js', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png',
-  '/assets/avatar.jpg', '/assets/idle.mp4', '/assets/talk.mp4'];
+  '/assets/avatar.jpg', '/assets/idle.mp4', '/assets/base.jpg', '/assets/mouth.jpg', '/assets/blink.jpg'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
