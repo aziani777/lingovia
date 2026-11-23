@@ -646,14 +646,27 @@ const face = (() => {
   }
   let raf = 0, open = 0, prev = 0, peak = 0.05, shape = 1, shapeTo = 1, cLo = 1e9, cHi = 0, wasOpen = false;
   let nextBlink = 0, blinkAt = -1, live = 0, fbuf = null, lastT = 0;
-  const api = { fake: false, start, stop, attach, use, react, state: () => ({ on: !!head, open: +vOpen.toFixed(2), shape: +vShape.toFixed(2), top: head ? Object.entries(head.w).sort((a, b) => b[1] - a[1])[0] : null }) };
+  const api = { fake: false, start, stop, attach, use, react, state: () => ({ on: !!head, mouth: +open.toFixed(2), level: +rms().toFixed(3), open: +vOpen.toFixed(2), shape: +vShape.toFixed(2), top: head ? Object.entries(head.w).sort((a, b) => b[1] - a[1])[0] : null }) };
 
   // Sound-by-sound mouth shapes (HeadAudio, MIT). Each detected sound maps to [lip shape row, openness].
   const VIS = { viseme_sil: [1, 0], viseme_PP: [1, 0], viseme_FF: [1, 0.7], viseme_TH: [1, 1.2], viseme_DD: [1, 1.5], viseme_kk: [1, 1.8],
     viseme_nn: [1, 1.4], viseme_RR: [0.3, 1.6], viseme_CH: [0, 1.5], viseme_SS: [2, 1.1], viseme_aa: [1, 4.2], viseme_E: [2, 2.7],
     viseme_I: [2, 1.7], viseme_O: [0, 3.1], viseme_U: [0, 1.7] };
   const heads = new Map(); let HA = null, head = null, vOpen = 0, vShape = 1;
+  let srcAn = null, tbuf = null, env = 0; const line = [];
+  // loudness of the voice right now (last 20 ms), read from the raw signal so it has no smoothing delay
+  function rms() {
+    if (!srcAn) return 0;
+    try {
+      if (!tbuf || tbuf.length !== srcAn.fftSize) tbuf = new Uint8Array(srcAn.fftSize);
+      srcAn.getByteTimeDomainData(tbuf);
+      const n = tbuf.length, from = Math.max(0, n - 1024); let e = 0;
+      for (let i = from; i < n; i++) { const d = (tbuf[i] - 128) / 128; e += d * d; }
+      return Math.sqrt(e / (n - from));
+    } catch { return 0; }
+  }
   async function attach(an) {
+    if (an && an.getByteTimeDomainData) srcAn = an;
     try {
       const ctx = an && an.context;
       if (!ctx || !ctx.audioWorklet) return;
@@ -721,24 +734,27 @@ const face = (() => {
       if (!heard) { peak = Math.max(v, peak * 0.9985, 0.03); const o = Math.min(1, Math.max(0, (v / peak - 0.14) / 0.72)); open += (o - open) * 0.3; av3d.set('viseme_aa', open * 0.55); }
       return;
     }
-    // loudness: slow auto-gain, a little lead to make up for the analyser's smoothing
-    peak = Math.max(v, peak * 0.9985, 0.03);
-    const lead = Math.max(0, v + (v - prev) * 0.8); prev = v;
-    const target = Math.min(1, Math.max(0, (lead / peak - 0.14) / 0.72));
-    open += (target - open) * (target > open ? 0.34 : 0.16);
-    // lip shape: dull sounds (o, u) round the lips, bright sounds (e, i, s) stretch them
-    const isOpen = open > 0.18;
-    if (c >= 0 && v > peak * 0.2) {
-      cLo = Math.min(c, cLo + 0.002); cHi = Math.max(c, cHi - 0.002);
-      if (cHi - cLo > 1) shapeTo = Math.min(2, Math.max(0, (c - cLo) / (cHi - cLo) * 2.4 - 0.2));
-    } else if (c < 0 && isOpen && !wasOpen) shapeTo = Math.random() * 2; // no spectrum: vary per syllable
-    wasOpen = isOpen;
-    shape += (shapeTo - shape) * 0.09;
+    /* How wide the mouth opens follows the loudness of the voice at this instant: it opens with each syllable and
+       closes as soon as she is silent. The speed is capped so the jaw moves like a jaw, not like a meter. */
+    const talking = stage0.classList.contains('talking');
+    let now = api.fake ? v : (talking || (!player.paused && !(L && L.conv)) ? rms() : 0);
+    // optional delay, for phones whose speaker plays a little after the signal is measured (set in the settings)
+    const lag = S.set.lipDelay || 0;
+    if (lag) { line.push([t, now]); while (line.length > 2 && line[1][0] <= t - lag) line.shift(); now = line[0][0] <= t - lag ? line[0][1] : 0; } else line.length = 0;
+    env = Math.max(now, env - dt * peak / 110);                 // hold through the tiny dips inside a syllable
+    peak = Math.max(now, peak * 0.9992, 0.02);
+    let target = env < peak * 0.07 ? 0 : Math.pow(Math.min(1, (env / peak - 0.07) / 0.6), 0.85);
+    if (!talking && L && L.conv) target = 0;
+    const step = target - open;
+    if (Math.abs(step) > 0.04) open += Math.max(-dt / 210, Math.min(dt / 150, step));   // full opening takes at least 150 ms, closing 210 ms
+    // lip shape (rounded, neutral, stretched) comes from the recognised sound, and changes gently
+    if (heard) shapeTo = vShape;
+    else if (open > 0.18 && !wasOpen) shapeTo = Math.random() * 2;
+    wasOpen = open > 0.18;
+    shape += (shapeTo - shape) * 0.08;
 
     g.globalAlpha = 1; g.drawImage(base, 0, 0, CW, CH);
-    // recognised sounds set the shape; loudness only scales it a little
-    if (heard) shape = vShape;
-    const f = heard ? Math.min(M.n - 1, vOpen * (0.8 + 0.35 * open)) : Math.pow(open, 0.9) * (M.n - 1) * 0.72, k0 = Math.floor(f), k1 = Math.min(M.n - 1, k0 + 1), a = f - k0;
+    const f = open * (M.n - 1) * 0.78, k0 = Math.floor(f), k1 = Math.min(M.n - 1, k0 + 1), a = f - k0;
     const r0 = Math.min(M.rows - 1, Math.floor(shape)), r1 = Math.min(M.rows - 1, r0 + 1), rb = shape - r0;
     row(r0, k0, k1, a, g, M.x, M.y);
     if (rb > 0.03 && r1 !== r0) { row(r1, k0, k1, a, tg, 0, 0); g.globalAlpha = rb; g.drawImage(tmp, M.x, M.y); g.globalAlpha = 1; }
@@ -1264,6 +1280,7 @@ function renderSettings() {
     <div class="set"><div><b>Afficher les traductions</b><span>Désactive pour deviner avant de toucher la phrase.</span></div><button class="sw ${s.showTr ? 'on' : ''}" data-k="showTr" aria-label="Traductions"></button></div>
     <div class="set"><div><b>Avatar 3D</b><span>Personnage animé avec lèvres synchronisées. Désactive pour revenir à la photo.</span></div><button class="sw ${s.three ? 'on' : ''}" data-k="three" aria-label="Avatar 3D"></button></div>
     <div class="set"><div><b>Débloquer tous les jours</b><span>Pour choisir librement dans le programme.</span></div><button class="sw ${s.unlockAll ? 'on' : ''}" data-k="unlockAll" aria-label="Débloquer"></button></div>
+    <div class="set"><div><b>Retard des lèvres</b><span>Si la bouche bouge avant le son sur ton téléphone, augmente un peu. Actuel : ${s.lipDelay || 0} ms.</span></div><input type="range" id="lipDelay" min="0" max="300" step="20" value="${s.lipDelay || 0}"></div>
     <div class="set"><div><b>Tester la voix</b><span>La voix de ${esc(c.tutor)}, en ${esc(c.target.name)} puis en ${esc(c.native.name)}.</span></div><button class="btn ghost" id="testVoice">Écouter</button></div>
   </div>
   <button class="btn ghost block" id="reset" style="margin-top:16px;color:#b42318">Remettre ma progression à zéro</button>`;
@@ -1277,7 +1294,7 @@ $('#settingsBody').addEventListener('click', e => {
   if (e.target.closest('#editProfile')) return startOnb(true);
   if (e.target.closest('#reset') && confirm('Effacer toute ta progression ?')) { S = structuredClone(DEF); save(); R = null; startOnb(); toast('Progression effacée'); }
 });
-$('#settingsBody').addEventListener('change', e => { if (e.target.id === 'rate') { S.set.rate = +e.target.value; save(); } });
+$('#settingsBody').addEventListener('change', e => { if (e.target.id === 'rate') { S.set.rate = +e.target.value; save(); } if (e.target.id === 'lipDelay') { S.set.lipDelay = +e.target.value; save(); renderSettings(); } });
 
 /* ---------- onboarding questionnaire ---------- */
 const OB = () => window.ONBOARDING[S.pair] || window.ONBOARDING['nl-fr'];
