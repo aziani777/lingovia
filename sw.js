@@ -1,4 +1,4 @@
-const CACHE = 'lingovia-v10';
+const CACHE = 'lingovia-v11';
 const SHELL = ['/', '/index.html', '/curriculum.js', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png',
   '/assets/avatar.jpg', '/assets/idle.mp4', '/assets/base.jpg', '/assets/mouth.jpg', '/assets/blink.jpg'];
 

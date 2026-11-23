@@ -1,5 +1,7 @@
 // Lingovia tutors. To add one: append an entry here, drop its model, thumbnail and sample in assets/avatars/,
 // and add its voice ids to the allow-list in api/speak.js.
+// video   : a tutor drawn from generated footage instead of a 3D model. dir holds base.jpg, mouth.jpg, blink.jpg, face.json
+//           (made by tools/build-face.py), idle.mp4 and the reaction clips listed in clips.
 // model   : rigged GLB with ARKit + Oculus viseme blend shapes (Avaturn, AvatarSDK, Ready Player Me, MPFB...)
 // opts    : TalkingHead showAvatar options for that model (body form, default mood, skeleton fixes)
 // tint    : optional colour changes applied to the model's materials, as [mesh name pattern, colour]. greyHair turns the hair silver.
@@ -24,7 +26,7 @@
       persona: '32, a Dutch teacher from Utrecht who lives in Amsterdam. Warm, patient and encouraging: you put the learner at ease and celebrate small wins. You love cycling and good coffee',
       voice: 'OlBRrVAItyi00MuGMbna', voiceBE: 'g7B5PNoscIXomLNUmHAb',
       sampleText: 'Hallo, ik ben Sanne! Avec moi, on prend le temps. On avance ensemble, tranquillement.',
-      model: '/assets/avatars/sanne.glb', mood: 'happy', opts: AVATURN }),
+      video: { dir: '/assets/avatars/sanne/', clips: { wave: 'wave.mp4', thumbs_up: 'thumbs.mp4', laugh: 'laugh.mp4' } } }),
     t('emma', { style: 'fun', tags: ['Enjouée', 'Drôle', 'Rapide'], name: 'Emma', gender: 'F', age: 24, trait: 'Dynamique',
       bio: 'Vive et drôle. Elle te fait parler vite et beaucoup.',
       persona: '24, a student from Rotterdam who tutors on the side. Energetic, funny and quick: you keep the learner talking and laughing, and you tease gently. You love festivals and street food',

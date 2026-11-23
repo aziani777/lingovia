@@ -77,6 +77,10 @@ h1,h2,h3{margin:0;line-height:1.15;letter-spacing:-.01em}
 .stage video,.stage img,.stage canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 22%}
 .stage #face{opacity:0;transition:opacity .18s}
 .stage.talking #face{opacity:1}
+.stage #vReact{opacity:0;transition:opacity .22s;pointer-events:none}
+.stage.reacting #vReact{opacity:1}
+.stage.vid>img,.stage.vid #vIdle,.stage.vid #face,.stage.vid #vReact{object-fit:cover;object-position:50% 16%}
+#lesson.call .stage.vid>img,#lesson.call .stage.vid #vIdle,#lesson.call .stage.vid #face,#lesson.call .stage.vid #vReact{object-position:50% 30%}
 .stage video,.stage>img{transform:scale(1.035)}
 .stage #av3d{position:absolute;inset:0;opacity:0;pointer-events:none;transition:opacity .35s;overflow:hidden;background:radial-gradient(120% 90% at 50% 35%,#f7efe2 0%,#e7ddcb 45%,#b9cfc9 100%)}
 .stage #av3d canvas{position:absolute;inset:0}
@@ -302,9 +306,10 @@ input[type=range]{width:120px;accent-color:var(--accent)}
   <!-- LESSON -->
   <section class="view" id="lesson">
     <div class="stage" id="stage">
-      <img src="/assets/avatar.jpg" alt="">
-      <video id="vIdle" src="/assets/idle.mp4" poster="/assets/avatar.jpg" muted loop playsinline preload="auto"></video>
-      <canvas id="face" width="640" height="640"></canvas>
+      <img src="" alt="">
+      <video id="vIdle" muted loop playsinline preload="auto"></video>
+      <canvas id="face" width="540" height="960"></canvas>
+      <video id="vReact" muted playsinline preload="auto"></video>
       <div id="av3d"></div>
       <div class="hud">
         <button class="pill" id="backBtn" aria-label="Retour">‹ Parcours</button>
@@ -523,7 +528,8 @@ const av3d = (() => {
   }
   async function show() {
     const a = AV(), my = ++token;
-    $('#stage').classList.add('nophoto'); $('#stage').querySelector(':scope > img').src = a.thumb;
+    if (!a.video) { $('#stage').classList.add('nophoto'); $('#stage').querySelector(':scope > img').src = a.thumb; }
+    if (a.video) return hide();          // video tutors are drawn by the face renderer
     if (!S.set.three) return hide();
     if (!(await boot()) || my !== token) return;
     if (shown !== a.id) {
@@ -605,14 +611,42 @@ const av3d = (() => {
 /* ---------- face: mouth shapes driven by the voice ---------- */
 const face = (() => {
   // sprite sheet: 3 rows (rounded, neutral, wide lips) x 6 columns (closed to open)
-  const M = { x: 215, y: 273, w: 235, h: 145, n: 6, rows: 3 }, B = { x: 221, y: 159, w: 211, h: 79 };
+  let M = null, B = null, CW = 540, CH = 960, base = null, mouth = null, blink = null, loaded = '', clips = {}, pending = null, reactEnd = 0;
   const cv = $('#face'), g = cv.getContext('2d');
-  const tmp = document.createElement('canvas'); tmp.width = M.w; tmp.height = M.h; const tg = tmp.getContext('2d');
+  const tmp = document.createElement('canvas'), tg = tmp.getContext('2d');
   const img = src => { const i = new Image(); i.src = src; return i; };
-  const base = img('/assets/base.jpg'), mouth = img('/assets/mouth.jpg'), blink = img('/assets/blink.jpg');
+  // load a video tutor: base frame, mouth and blink sprites, idle loop and reaction clips
+  async function use(a) {
+    const stage = $('#stage'), v = a && a.video;
+    stage.classList.toggle('vid', !!v); stage.classList.remove('reacting'); pending = null;
+    if (!v) { loaded = ''; M = null; return; }
+    stage.classList.remove('nophoto', 'three');
+    stage.querySelector(':scope > img').src = v.dir + 'base.jpg';
+    const idle = $('#vIdle'); if (!idle.src.endsWith(v.dir + 'idle.mp4')) { idle.poster = v.dir + 'base.jpg'; idle.src = v.dir + 'idle.mp4'; }
+    idle.play().catch(() => {});
+    clips = v.clips || {};
+    if (loaded === a.id) return;
+    try {
+      const meta = await (await fetch(v.dir + 'face.json')).json();
+      CW = meta.w; CH = meta.h; cv.width = CW; cv.height = CH; tmp.width = meta.mouth.w; tmp.height = meta.mouth.h;
+      base = img(v.dir + 'base.jpg'); mouth = img(v.dir + 'mouth.jpg'); blink = img(v.dir + 'blink.jpg');
+      M = meta.mouth; B = meta.blink; loaded = a.id;
+      for (const c of Object.values(clips)) fetch(v.dir + c).catch(() => {});   // warm the cache
+    } catch { M = null; }
+  }
+  // a reaction clip (wave, thumbs up, laugh). It waits for the end of the sentence so the lips never freeze mid-word.
+  function react(name) {
+    const file = clips[name]; if (!file || !loaded) return false;
+    if ($('#stage').classList.contains('talking')) { pending = { name, t: performance.now() }; return true; }
+    const v = $('#vReact'), dir = AV().video.dir;
+    v.src = dir + file; v.currentTime = 0;
+    v.onended = () => $('#stage').classList.remove('reacting');
+    v.play().then(() => { $('#stage').classList.add('reacting'); reactEnd = performance.now() + 5200; }).catch(() => {});
+    return true;
+  }
   let raf = 0, open = 0, prev = 0, peak = 0.05, shape = 1, shapeTo = 1, cLo = 1e9, cHi = 0, wasOpen = false;
   let nextBlink = 0, blinkAt = -1, live = 0, fbuf = null, lastT = 0;
-  const api = { fake: false, start, stop, attach, state: () => ({ on: !!head, open: +vOpen.toFixed(2), shape: +vShape.toFixed(2), top: head ? Object.entries(head.w).sort((a, b) => b[1] - a[1])[0] : null }) };
+  const api = { fake: false, start, stop, attach, use, react, state: () => ({ on: !!head, open: +vOpen.toFixed(2), shape: +vShape.toFixed(2), top: head ? Object.entries(head.w).sort((a, b) => b[1] - a[1])[0] : null }) };
 
   // Sound-by-sound mouth shapes (HeadAudio, MIT). Each detected sound maps to [lip shape row, openness].
   const VIS = { viseme_sil: [1, 0], viseme_PP: [1, 0], viseme_FF: [1, 0.7], viseme_TH: [1, 1.2], viseme_DD: [1, 1.5], viseme_kk: [1, 1.8],
@@ -675,7 +709,10 @@ const face = (() => {
   }
   function frame(t) {
     raf = requestAnimationFrame(frame);
-    if (!base.complete || !mouth.complete) return;
+    const stage0 = $('#stage');
+    if (pending && !stage0.classList.contains('talking')) { const q = pending; pending = null; if (t - q.t < 9000) react(q.name); }
+    if (stage0.classList.contains('reacting') && (t > reactEnd || (stage0.classList.contains('talking') && $('#vReact').currentTime > 2.2))) stage0.classList.remove('reacting');
+    if (!M || !base.complete || !mouth.complete) return;
     const dt = Math.min(100, lastT ? t - lastT : 16); lastT = t;
     const [v, c] = listen(t);
     const heard = !api.fake && visemes(dt);
@@ -697,7 +734,7 @@ const face = (() => {
     wasOpen = isOpen;
     shape += (shapeTo - shape) * 0.09;
 
-    g.globalAlpha = 1; g.drawImage(base, 0, 0, 640, 640);
+    g.globalAlpha = 1; g.drawImage(base, 0, 0, CW, CH);
     // recognised sounds set the shape; loudness only scales it a little
     if (heard) shape = vShape;
     const f = heard ? Math.min(M.n - 1, vOpen * (0.8 + 0.35 * open)) : Math.pow(open, 0.9) * (M.n - 1) * 0.72, k0 = Math.floor(f), k1 = Math.min(M.n - 1, k0 + 1), a = f - k0;
@@ -779,7 +816,7 @@ function openLesson(d, trial) {
   $('#dayPill').textContent = `Jour ${d} · ${info.level}`;
   $('#tutorName').textContent = AV().name; $('#timer').textContent = ''; $('#helpBtn').hidden = true; $('#cctl').hidden = true; $('#lost').hidden = true; $('#subs').innerHTML = ''; $('#lesson').classList.remove('audio'); $('#orb').querySelector('b').textContent = AV().name[0];
   show('lesson');
-  $('#vIdle').play().catch(() => {}); face.start(); av3d.show();
+  face.use(AV()); face.start(); av3d.show();
   add(`<h3>${esc(info.title)}</h3><p class="sub">${esc(info.focus)}. ${esc(info.scenario)}</p>
     ${info.phrases.map((p, i) => `<button class="ph" data-say="${i}"><div><b>${esc(p.target)}</b><span>${esc(p.native)}</span></div>${ICON.spk}</button>`).join('')}
     <button class="btn block" id="startBtn" style="margin-top:14px">Appeler ${esc(AV().name)}</button>
@@ -857,6 +894,9 @@ function learnerText() {
   ].filter(Boolean).join('\n');
 }
 
+// reactions go to the 3D model, or to a clip for video tutors
+const VCLIP = { wave: 'wave', thumbs_up: 'thumbs_up', ok: 'thumbs_up', proud: 'thumbs_up', laugh: 'laugh' };
+function reactTo(name, dur) { if (AV().video) { if (VCLIP[name]) face.react(VCLIP[name]); } else av3d.react(name, dur); }
 // state shown under the tutor's name: listening, thinking or speaking
 function setState(st) {
   const stage = $('#stage');
@@ -903,9 +943,9 @@ async function startCall(resume) {
         sub(`<b>${esc(dutch)}</b><span>${esc(french)}</span>`, 'tcard', 9000); },
       show_correction: ({ said, correct, why }) => { if (L !== mine || !correct) return; L.fixes.push({ said, correct, why });
         add(`<h4>Petite correction</h4><s>${esc(said)}</s><div class="good">${esc(correct)}</div><p>${esc(why)}</p>`, 'fix');
-        sub(`<h4>Petite correction</h4><s>${esc(said)}</s><b>${esc(correct)}</b><span>${esc(why)}</span>`, 'tcard fixc', 11000); av3d.react('thinking', 2); },
-      lesson_done: ({ praise }) => { if (L === mine) { L.complete = true; L.praise = praise || ''; av3d.react('thumbs_up', 3); } },
-      react: ({ reaction }) => { if (L === mine) av3d.react(reaction); },
+        sub(`<h4>Petite correction</h4><s>${esc(said)}</s><b>${esc(correct)}</b><span>${esc(why)}</span>`, 'tcard fixc', 11000); reactTo('thinking', 2); },
+      lesson_done: ({ praise }) => { if (L === mine) { L.complete = true; L.praise = praise || ''; reactTo('thumbs_up', 3); } },
+      react: ({ reaction }) => { if (L === mine) reactTo(reaction); },
     },
     onMessage: m => {
       if (L !== mine || !m || !m.message) return;
@@ -914,7 +954,7 @@ async function startCall(resume) {
       const me = m.source === 'user' || m.role === 'user';
       L.log.push({ role: me ? 'user' : 'tutor', text: m.message });
       if (me) { L.turns++; add(esc(m.message), 'msg me'); if (S.set.subs) sub(esc(m.message), 'line me', 5000);
-        if (L.state !== 'speaking') { setState('thinking'); if (Math.random() < 0.45) av3d.react('nod', 2); } }
+        if (L.state !== 'speaking') { setState('thinking'); if (Math.random() < 0.45) reactTo('nod', 2); } }
       else { add(`<div>${esc(m.message)}</div><div class="hint">Touche pour traduire</div>`, 'msg her tap').dataset.x = m.message; subTutor(m.message); }
     },
     onModeChange: ({ mode }) => {
@@ -942,7 +982,7 @@ async function startCall(resume) {
   const audio = S.set.audioOnly;
   $('#lesson').classList.add('call'); $('#lesson').classList.toggle('audio', audio);
   $('#cctl').hidden = false; $('#helpBtn').hidden = false; $('#lost').hidden = true; setState('online'); paintCall();
-  if (audio) av3d.hide(); else { av3d.view(true); setTimeout(() => av3d.react('wave', 2.5), 500); }
+  if (audio) av3d.hide(); else { av3d.view(true); if (AV().video) face.react('wave'); else setTimeout(() => av3d.react('wave', 2.5), 500); }
   clearInterval(tick);
   tick = setInterval(() => {
     const t = Math.floor((Date.now() - mine.t0) / 1000); $('#timer').textContent = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;

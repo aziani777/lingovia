@@ -1,116 +1,126 @@
-import cv2, numpy as np, json, sys, mediapipe as mp
+"""Build the animated-face assets of a video tutor from two generated clips.
+
+    python3 tools/build-face.py <talk.mp4> <idle.mp4> <out_dir> [output_width]
+
+From the talking clip it picks mouth shapes (3 lip widths x 6 openings), aligns them on the first
+frame and writes them as a sprite sheet. From the idle clip it takes a half and a full blink.
+Outputs base.jpg, mouth.jpg, blink.jpg, face.json and preview.jpg in <out_dir>.
+
+Needs: pip install mediapipe opencv-python-headless numpy, and face_landmarker.task next to this
+script or in the working directory (https://storage.googleapis.com/mediapipe-models/face_landmarker/
+face_landmarker/float16/1/face_landmarker.task).
+"""
+import cv2, numpy as np, json, sys, os, mediapipe as mp
 from mediapipe.tasks import python as mpp
 from mediapipe.tasks.python import vision
-D='/tmp/claude-0/-home-user-nowera/c1ee66a9-671a-52e7-bd42-9242331d3053/scratchpad/dl/'
-det=vision.FaceLandmarker.create_from_options(vision.FaceLandmarkerOptions(base_options=mpp.BaseOptions(model_asset_path='face_landmarker.task'),output_face_blendshapes=True,num_faces=1))
-def frames(path):
-    c=cv2.VideoCapture(path); out=[]
-    while True:
-        ok,f=c.read()
-        if not ok: break
-        out.append(f)
-    return out
-def analyse(f):
-    r=det.detect(mp.Image(image_format=mp.ImageFormat.SRGB,data=cv2.cvtColor(f,cv2.COLOR_BGR2RGB)))
-    if not r.face_landmarks: return None
-    h,w=f.shape[:2]
-    pts=np.array([[p.x*w,p.y*h] for p in r.face_landmarks[0]],np.float32)
-    bs={b.category_name:b.score for b in r.face_blendshapes[0]}
-    return pts,bs
-STABLE=[33,133,362,263,6,168,10,127,356,197,195]
-talk=frames(D+'talk_raw.mp4'); idle=frames(D+'idle_raw.mp4')
-print('frames',len(talk),len(idle),talk[0].shape)
-ref=talk[0]; rp,rb=analyse(ref); H,W=ref.shape[:2]
-def align(f,pts):
-    M,_=cv2.estimateAffinePartial2D(pts[STABLE],rp[STABLE],method=cv2.LMEDS)
-    a=cv2.warpAffine(f,M,(W,H),flags=cv2.INTER_LANCZOS4,borderMode=cv2.BORDER_REFLECT)
-    p2=cv2.transform(pts[None],M)[0]
-    err=float(np.abs(p2[STABLE]-rp[STABLE]).mean())
-    return a,p2,err,M
-face_h=float(np.linalg.norm(rp[10]-rp[152]))
-rows=[]
-for i,f in enumerate(talk):
-    r=analyse(f)
-    if r is None: continue
-    pts,bs=r; a,p2,err,M=align(f,pts)
-    op=float(np.linalg.norm(p2[13]-p2[14])/face_h); wd=float(np.linalg.norm(p2[61]-p2[291])/face_h)
-    rot=abs(np.degrees(np.arctan2(M[1,0],M[0,0]))); 
-    rows.append(dict(i=i,op=op,wd=wd,err=err,rot=float(rot),jaw=bs.get('jawOpen',0),a=a,p=p2))
-ops=np.array([r['op'] for r in rows]); print('openness min/med/max',ops.min(),np.median(ops),ops.max(),'ref',float(np.linalg.norm(rp[13]-rp[14])/face_h), 'err med',np.median([r['err'] for r in rows]))
-# region: mouth + chin, generous
-xs=[rp[i][0] for i in (61,291,172,397,132,361)]; 
-x0=int(min(xs)-0.02*W); x1=int(max(xs)+0.02*W); y0=int(rp[2][1]-0.005*H); y1=int(min(H-1,rp[152][1]+0.05*H))
-x0-=x0%2; y0-=y0%2; x1+= (x1-x0)%2; y1+=(y1-y0)%2
-pw,ph=x1-x0,y1-y0; print('patch',x0,y0,pw,ph)
-# feather mask: ellipse, 1 in the centre, 0 at the border
-yy,xx=np.mgrid[0:ph,0:pw].astype(np.float32)
-d=np.sqrt(((xx-pw/2)/(pw/2))**2+((yy-ph*0.45)/(ph*0.55))**2)
-mask=np.clip((1.0-d)/0.28,0,1); mask=cv2.GaussianBlur(mask,(0,0),6)[...,None]
-K=8
-targets=np.linspace(0,np.percentile(ops,97),K)
-base_op=float(np.linalg.norm(rp[13]-rp[14])/face_h)
-chosen=[]; patches=[]
-for k,t in enumerate(targets):
-    if k==0: patches.append(ref[y0:y1,x0:x1].copy()); chosen.append(('ref',base_op)); continue
-    # nearest openness, penalise alignment error, rotation and unusual width
-    best=min(rows,key=lambda r: abs(r['op']-t)*400 + r['err']*1.5 + r['rot']*2 + abs(r['wd']-np.median([q['wd'] for q in rows]))*120)
-    a=best['a'][y0:y1,x0:x1].astype(np.float32); b=ref[y0:y1,x0:x1].astype(np.float32)
-    # match overall brightness of the patch border to the base
-    patches.append(np.clip(a*mask+b*(1-mask),0,255).astype(np.uint8)); chosen.append((best['i'],round(best['op'],4),round(best['err'],2)))
-print('chosen',chosen)
-# blink patches from the idle video
-ex=[rp[i][0] for i in (33,263,127,356)]; ey=[rp[i][1] for i in (105,334,230,450)]
-bx0=int(min(ex)+0.0*W); bx1=int(max(ex)); by0=int(min(ey)-0.01*H); by1=int(max(ey)+0.01*H)
-bx0-=bx0%2; by0-=by0%2; bx1+=(bx1-bx0)%2; by1+=(by1-by0)%2
-bw,bh=bx1-bx0,by1-by0
-yy,xx=np.mgrid[0:bh,0:bw].astype(np.float32)
-d=np.maximum(np.abs(xx-bw/2)/(bw/2),np.abs(yy-bh/2)/(bh/2)); bm=cv2.GaussianBlur(np.clip((1-d)/0.25,0,1),(0,0),5)[...,None]
-irows=[]
-for i,f in enumerate(idle):
-    r=analyse(f)
-    if r is None: continue
-    pts,bs=r; a,p2,err,M=align(f,pts)
-    irows.append(dict(i=i,bl=(bs.get('eyeBlinkLeft',0)+bs.get('eyeBlinkRight',0))/2,err=err,a=a))
-bl=np.array([r['bl'] for r in irows]); print('blink max',bl.max(),'ref',(rb.get('eyeBlinkLeft',0)+rb.get('eyeBlinkRight',0))/2)
-bp=[]
-for t in (bl.max()*0.55,bl.max()):
-    best=min(irows,key=lambda r: abs(r['bl']-t)*30+r['err']*1.5)
-    a=best['a'][by0:by1,bx0:bx1].astype(np.float32); b=ref[by0:by1,bx0:bx1].astype(np.float32)
-    bp.append(np.clip(a*bm+b*(1-bm),0,255).astype(np.uint8)); print('blink frame',best['i'],round(best['bl'],2),round(best['err'],2))
-S=640/W  # output scale
-def sc(img): return cv2.resize(img,(round(img.shape[1]*S),round(img.shape[0]*S)),interpolation=cv2.INTER_AREA)
-cv2.imwrite('base.jpg',sc(ref),[cv2.IMWRITE_JPEG_QUALITY,86])
-cv2.imwrite('mouth.jpg',np.hstack([sc(p) for p in patches]),[cv2.IMWRITE_JPEG_QUALITY,88])
-cv2.imwrite('blink.jpg',np.hstack([sc(p) for p in bp]),[cv2.IMWRITE_JPEG_QUALITY,88])
-meta=dict(size=640,mouth=dict(x=round(x0*S),y=round(y0*S),w=round(pw*S),h=round(ph*S),n=K),blink=dict(x=round(bx0*S),y=round(by0*S),w=round(bw*S),h=round(bh*S),n=2))
-json.dump(meta,open('face.json','w')); print(meta)
-# preview: each level composited on the base
-prev=[]
-for p in patches:
-    f=ref.copy(); f[y0:y1,x0:x1]=p; prev.append(cv2.resize(f[int(H*0.25):int(H*0.85),int(W*0.2):int(W*0.8)],(300,300)))
-f=ref.copy(); f[by0:by1,bx0:bx1]=bp[1]; prev.append(cv2.resize(f[int(H*0.25):int(H*0.85),int(W*0.2):int(W*0.8)],(300,300)))
-cv2.imwrite('preview.jpg',np.vstack([np.hstack(prev[:5]),np.hstack(prev[5:]+[np.zeros((300,300,3),np.uint8)]*(10-len(prev)))]))
 
-# ---- viseme grid: 3 mouth widths (round, neutral, wide) x 6 openness levels ----
-wds=np.array([r['wd'] for r in rows]); base_wd=float(np.linalg.norm(rp[61]-rp[291])/face_h)
-wt=[np.percentile(wds,12),np.percentile(wds,50),np.percentile(wds,90)]
-ot=np.linspace(0,np.percentile(ops,96),6)
-ws=wds.std()+1e-6; os_=ops.std()+1e-6
-print('width targets',[round(float(x),4) for x in wt],'base',round(base_wd,4),'open targets',[round(float(x),4) for x in ot])
-grid=[]; info=[]
-for wi,w in enumerate(wt):
-    row=[]
-    for k,t in enumerate(ot):
-        if k==0 and wi==1: row.append(ref[y0:y1,x0:x1].copy()); info.append('ref'); continue
-        best=min(rows,key=lambda r: ((r['op']-t)/os_)**2*3 + ((r['wd']-w)/ws)**2 + r['err']*0.25 + r['rot']*0.4)
-        a=best['a'][y0:y1,x0:x1].astype(np.float32); b=ref[y0:y1,x0:x1].astype(np.float32)
-        row.append(np.clip(a*mask+b*(1-mask),0,255).astype(np.uint8)); info.append((best['i'],round(best['op'],3),round(best['wd'],3)))
+talk_path, idle_path, out = sys.argv[1], sys.argv[2], sys.argv[3]
+OUT_W = int(sys.argv[4]) if len(sys.argv) > 4 else 540
+os.makedirs(out, exist_ok=True)
+model = next(p for p in ('face_landmarker.task', os.path.join(os.path.dirname(__file__), 'face_landmarker.task')) if os.path.exists(p))
+det = vision.FaceLandmarker.create_from_options(vision.FaceLandmarkerOptions(
+    base_options=mpp.BaseOptions(model_asset_path=model), output_face_blendshapes=True, num_faces=1))
+
+def frames(path):
+    c = cv2.VideoCapture(path); res = []
+    while True:
+        ok, f = c.read()
+        if not ok: break
+        res.append(f)
+    return res
+
+def analyse(f):
+    r = det.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=cv2.cvtColor(f, cv2.COLOR_BGR2RGB)))
+    if not r.face_landmarks: return None
+    h, w = f.shape[:2]
+    pts = np.array([[p.x * w, p.y * h] for p in r.face_landmarks[0]], np.float32)
+    return pts, {b.category_name: b.score for b in r.face_blendshapes[0]}
+
+STABLE = [33, 133, 362, 263, 6, 168, 10, 127, 356, 197, 195]   # eye corners, nose bridge, temples: they do not move when talking
+talk, idle = frames(talk_path), frames(idle_path)
+ref = talk[0]; H, W = ref.shape[:2]
+rp, rb = analyse(ref)
+face_h = float(np.linalg.norm(rp[10] - rp[152]))
+print('frames', len(talk), len(idle), 'size', W, H, 'face height', round(face_h))
+
+def align(f, pts):
+    M, _ = cv2.estimateAffinePartial2D(pts[STABLE], rp[STABLE], method=cv2.LMEDS)
+    a = cv2.warpAffine(f, M, (W, H), flags=cv2.INTER_LANCZOS4, borderMode=cv2.BORDER_REFLECT)
+    p2 = cv2.transform(pts[None], M)[0]
+    return a, p2, float(np.abs(p2[STABLE] - rp[STABLE]).mean()), abs(np.degrees(np.arctan2(M[1, 0], M[0, 0])))
+
+rows = []
+for i, f in enumerate(talk):
+    r = analyse(f)
+    if r is None: continue
+    a, p2, err, rot = align(f, r[0])
+    rows.append(dict(i=i, a=a, err=err / face_h * 100, rot=float(rot),
+                     op=float(np.linalg.norm(p2[13] - p2[14]) / face_h), wd=float(np.linalg.norm(p2[61] - p2[291]) / face_h)))
+ops = np.array([r['op'] for r in rows]); wds = np.array([r['wd'] for r in rows])
+print('faces found in', len(rows), 'talk frames | opening', round(float(ops.min()), 3), 'to', round(float(ops.max()), 3))
+
+# mouth and chin region, with a soft elliptical mask so the patch melts into the base frame
+m = 0.06 * face_h
+xs = [rp[i][0] for i in (61, 291, 172, 397, 132, 361)]
+x0, x1 = int(min(xs) - m), int(max(xs) + m)
+y0, y1 = int(rp[2][1] - 0.02 * face_h), int(min(H - 1, rp[152][1] + 0.16 * face_h))
+x0 -= x0 % 2; y0 -= y0 % 2; x1 += (x1 - x0) % 2; y1 += (y1 - y0) % 2
+pw, ph = x1 - x0, y1 - y0
+yy, xx = np.mgrid[0:ph, 0:pw].astype(np.float32)
+d = np.sqrt(((xx - pw / 2) / (pw / 2)) ** 2 + ((yy - ph * 0.45) / (ph * 0.55)) ** 2)
+mask = cv2.GaussianBlur(np.clip((1.0 - d) / 0.28, 0, 1), (0, 0), max(1.5, face_h / 60))[..., None]
+
+wt = [np.percentile(wds, 12), np.percentile(wds, 50), np.percentile(wds, 90)]     # rounded, neutral, wide lips
+ot = np.linspace(0, np.percentile(ops, 96), 6)                                    # closed to open
+ws, os_ = wds.std() + 1e-6, ops.std() + 1e-6
+grid = []
+for wi, w in enumerate(wt):
+    row = []
+    for k, t in enumerate(ot):
+        if k == 0 and wi == 1: row.append(ref[y0:y1, x0:x1].copy()); continue
+        best = min(rows, key=lambda r: ((r['op'] - t) / os_) ** 2 * 3 + ((r['wd'] - w) / ws) ** 2 + r['err'] * 0.6 + r['rot'] * 0.4)
+        a, b = best['a'][y0:y1, x0:x1].astype(np.float32), ref[y0:y1, x0:x1].astype(np.float32)
+        row.append(np.clip(a * mask + b * (1 - mask), 0, 255).astype(np.uint8))
     grid.append(row)
-for wi in range(3): print('row',wi,info[wi*6:(wi+1)*6])
-cv2.imwrite('mouth.jpg',np.vstack([np.hstack([sc(p) for p in row]) for row in grid]),[cv2.IMWRITE_JPEG_QUALITY,88])
-meta['mouth'].update(n=6,rows=3); json.dump(meta,open('face.json','w')); print(meta)
-prev=[]
+
+# blink: eyes region from the idle clip
+ex = [rp[i][0] for i in (33, 263, 127, 356)]; ey = [rp[i][1] for i in (105, 334, 230, 450)]
+bx0, bx1 = int(min(ex)), int(max(ex)); by0, by1 = int(min(ey) - 0.03 * face_h), int(max(ey) + 0.03 * face_h)
+bx0 -= bx0 % 2; by0 -= by0 % 2; bx1 += (bx1 - bx0) % 2; by1 += (by1 - by0) % 2
+bw, bh = bx1 - bx0, by1 - by0
+yy, xx = np.mgrid[0:bh, 0:bw].astype(np.float32)
+d = np.maximum(np.abs(xx - bw / 2) / (bw / 2), np.abs(yy - bh / 2) / (bh / 2))
+bm = cv2.GaussianBlur(np.clip((1 - d) / 0.25, 0, 1), (0, 0), max(1.5, face_h / 70))[..., None]
+irows = []
+for f in idle:
+    r = analyse(f)
+    if r is None: continue
+    a, _, err, _ = align(f, r[0])
+    irows.append(dict(a=a, err=err / face_h * 100, bl=(r[1].get('eyeBlinkLeft', 0) + r[1].get('eyeBlinkRight', 0)) / 2))
+bl = np.array([r['bl'] for r in irows]); print('blink max', round(float(bl.max()), 2))
+bp = []
+for t in (bl.max() * 0.55, bl.max()):
+    best = min(irows, key=lambda r: abs(r['bl'] - t) * 30 + r['err'] * 0.6)
+    a, b = best['a'][by0:by1, bx0:bx1].astype(np.float32), ref[by0:by1, bx0:bx1].astype(np.float32)
+    bp.append(np.clip(a * bm + b * (1 - bm), 0, 255).astype(np.uint8))
+
+S = OUT_W / W
+sc = lambda im, w, h: cv2.resize(im, (w, h), interpolation=cv2.INTER_AREA)
+MW, MH, BW, BH = round(pw * S), round(ph * S), round(bw * S), round(bh * S)
+cv2.imwrite(f'{out}/base.jpg', sc(ref, OUT_W, round(H * S)), [cv2.IMWRITE_JPEG_QUALITY, 86])
+cv2.imwrite(f'{out}/mouth.jpg', np.vstack([np.hstack([sc(p, MW, MH) for p in row]) for row in grid]), [cv2.IMWRITE_JPEG_QUALITY, 90])
+cv2.imwrite(f'{out}/blink.jpg', np.hstack([sc(p, BW, BH) for p in bp]), [cv2.IMWRITE_JPEG_QUALITY, 90])
+meta = dict(w=OUT_W, h=round(H * S), mouth=dict(x=round(x0 * S), y=round(y0 * S), w=MW, h=MH, n=6, rows=3),
+            blink=dict(x=round(bx0 * S), y=round(by0 * S), w=BW, h=BH),
+            face=dict(x=round(float(rp[:, 0].min()) * S), y=round(float(rp[10][1] - 0.35 * face_h) * S), w=round(float(rp[:, 0].max() - rp[:, 0].min()) * S), h=round(face_h * 1.5 * S)))
+json.dump(meta, open(f'{out}/face.json', 'w')); print(meta)
+
+# preview of every mouth shape and the closed eyes, composited on the base frame
+cx0, cx1 = int(max(0, rp[:, 0].min() - 0.3 * face_h)), int(min(W, rp[:, 0].max() + 0.3 * face_h))
+cy0, cy1 = int(max(0, rp[10][1] - 0.4 * face_h)), int(min(H, rp[152][1] + 0.4 * face_h))
+prev = []
 for row in grid:
     for p in row:
-        f=ref.copy(); f[y0:y1,x0:x1]=p; prev.append(cv2.resize(f[int(H*0.3):int(H*0.8),int(W*0.25):int(W*0.75)],(240,240)))
-cv2.imwrite('preview2.jpg',np.vstack([np.hstack(prev[i*6:(i+1)*6]) for i in range(3)]))
+        f = ref.copy(); f[y0:y1, x0:x1] = p; prev.append(cv2.resize(f[cy0:cy1, cx0:cx1], (220, 260)))
+f = ref.copy(); f[by0:by1, bx0:bx1] = bp[1]; blink_prev = cv2.resize(f[cy0:cy1, cx0:cx1], (220, 260))
+cv2.imwrite(f'{out}/preview.jpg', np.vstack([np.hstack(prev[i * 6:(i + 1) * 6]) for i in range(3)] + [np.hstack([blink_prev] + [np.zeros((260, 220, 3), np.uint8)] * 5)]))
