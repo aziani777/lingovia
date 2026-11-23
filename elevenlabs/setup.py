@@ -39,7 +39,8 @@ for name, desc, props in TOOLS:
     else: tool_ids.append(call('POST', '/v1/convai/tools', cfg)['id'])
 
 DV = {'day': '1', 'level': 'A0', 'lesson_title': 'Dire bonjour', 'focus': 'Les salutations', 'scenario': 'Première rencontre.',
-      'phrases': '- Hallo! = Salut !', 'balance': 'Mostly French, with short Dutch phrases.', 'greeting': 'Hallo! Moi c\'est Sanne. Tu es prêt ?'}
+      'phrases': '- Hallo! = Salut !', 'balance': 'Mostly French, with short Dutch phrases.', 'greeting': 'Hallo! Moi c\'est Sanne. Tu es prêt ?',
+      'tutor_name': 'Sanne', 'persona': '32, a Dutch teacher from Utrecht. Warm, patient and encouraging', 'learner': 'A French speaker, complete beginner.', 'recap': ''}
 agent = {
     'name': os.environ.get('LINGOVIA_AGENT_NAME', 'Lingovia - Sanne (nl-fr)'),
     'conversation_config': {
@@ -57,6 +58,8 @@ agent = {
         'conversation': {'max_duration_seconds': 1200, 'client_events': ['audio', 'interruption', 'user_transcript', 'agent_response', 'agent_response_correction', 'client_tool_call', 'vad_score']},
     },
 }
+# each call may pick the tutor's voice
+agent['platform_settings'] = {'overrides': {'conversation_config_override': {'tts': {'voice_id': True}}}}
 agent_id = sys.argv[1] if len(sys.argv) > 1 else None
 if agent_id: call('PATCH', f'/v1/convai/agents/{agent_id}', agent)
 else: agent_id = call('POST', '/v1/convai/agents/create', agent)['agent_id']
