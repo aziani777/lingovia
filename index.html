@@ -40,7 +40,7 @@ h1,h2,h3{margin:0;line-height:1.15;letter-spacing:-.01em}
 
 /* hero */
 .hero{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);padding:16px;display:flex;gap:14px;align-items:center}
-.hero img{width:84px;height:84px;border-radius:50%;object-fit:cover;object-position:50% 25%;flex:none;border:3px solid var(--accent-soft)}
+.hero img{width:84px;height:84px;border-radius:50%;object-fit:cover;object-position:50% 30%;background:#e7ddcb;flex:none;border:3px solid var(--accent-soft)}
 .hero small{color:var(--muted);font-weight:600}
 .hero h2{font-size:20px;margin:2px 0 10px}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:var(--accent);color:var(--accent-ink);font-weight:700;padding:12px 18px;border-radius:14px;min-height:46px}
@@ -81,7 +81,8 @@ h1,h2,h3{margin:0;line-height:1.15;letter-spacing:-.01em}
 .stage #av3d{position:absolute;inset:0;opacity:0;pointer-events:none;transition:opacity .35s;overflow:hidden;background:radial-gradient(120% 90% at 50% 35%,#f7efe2 0%,#e7ddcb 45%,#b9cfc9 100%)}
 .stage #av3d canvas{position:absolute;inset:0}
 .stage.three #av3d{opacity:1}
-.stage.nophoto>img,.stage.nophoto #vIdle,.stage.nophoto #face{visibility:hidden}
+.stage.nophoto #vIdle,.stage.nophoto #face{visibility:hidden}
+.stage.nophoto>img{object-fit:contain;object-position:50% 40%;transform:none}
 .stage.nophoto{background:radial-gradient(120% 90% at 50% 35%,#f7efe2 0%,#e7ddcb 45%,#b9cfc9 100%)}
 .stage::after{z-index:1;content:"";position:absolute;inset:auto 0 0 0;height:120px;background:linear-gradient(transparent,rgba(0,0,0,.65));pointer-events:none}
 .stage .hud{position:absolute;left:0;right:0;top:0;padding:calc(10px + var(--safe-t)) 12px 0;display:flex;gap:8px;align-items:center;z-index:2}
@@ -336,10 +337,10 @@ function renderHome() {
   const c = C(), cur = currentDay(), info = dayInfo(cur), n = doneCount();
   $('#pairTag').textContent = `${c.target.code.toUpperCase()} · ${c.native.code.toUpperCase()}`;
   $('#streakTag').textContent = `${S.streak} jour${S.streak > 1 ? 's' : ''} de suite`;
-  let h = `<div class="hero"><img src="/assets/avatar.jpg" alt="${esc(c.tutor)}"><div style="flex:1;min-width:0">
+  let h = `<div class="hero"><img src="${esc(AV().thumb)}" alt="${esc(AV().name)}"><div style="flex:1;min-width:0">
     <small>${n >= 90 ? 'Programme terminé' : `Jour ${cur} sur 90 · ${esc(info.level)}`}</small>
     <h2>${esc(info.title)}</h2>
-    <button class="btn" data-day="${cur}">${n ? 'Continuer' : 'Commencer'} avec ${esc(c.tutor)}</button></div></div>
+    <button class="btn" data-day="${cur}">${n ? 'Continuer' : 'Commencer'} avec ${esc(AV().name)}</button></div></div>
     <div class="overall"><span>Ta progression</span><span>${n} / 90 jours</span></div>
     <div class="bar"><b style="width:${n / 90 * 100}%"></b></div>`;
   for (const p of c.phases) {
@@ -439,14 +440,16 @@ async function speak(items, slow) {
 
 /* ---------- 3D avatar (TalkingHead, MIT) ---------- */
 const av3d = (() => {
-  let head = null, booting = null, shown = null, lastEnd = 0, token = 0;
+  let head = null, booting = null, shown = null, lastEnd = 0, token = 0, THREE = null;
+  const hair = { on: false, u: null, bone: null, p: null, v: null, x: null, tmp: null, t: 0 };
   const REACT = { smile: '😊', laugh: '😄', surprised: '😳', thinking: '🤔', wink: '😉', nod: 'yes', shake_head: 'no', wave: '👋',
     thumbs_up: '👍', ok: '👌', shrug: '🤷', proud: '🥰', oops: '😬' };
   const on = () => !!head && $('#stage').classList.contains('three');
   function boot() {
     return booting || (booting = (async () => {
       const { TalkingHead } = await import('/vendor/talkinghead/talkinghead.mjs');
-      head = new TalkingHead($('#av3d'), { ttsEndpoint: null, lipsyncModules: [], cameraView: 'head', cameraDistance: 0.4, cameraY: 0.09,
+      THREE = await import('three');
+      head = new TalkingHead($('#av3d'), { update: dt => hairTick(dt), ttsEndpoint: null, lipsyncModules: [], cameraView: 'head', cameraDistance: 0.4, cameraY: 0.09,
         cameraRotateEnable: false, modelFPS: 30, modelPixelRatio: Math.min(2, window.devicePixelRatio || 1),
         avatarIdleEyeContact: 0.6, avatarSpeakingEyeContact: 0.8, avatarSpeakingHeadMove: 0.6, lightAmbientIntensity: 2, lightDirectIntensity: 20 });
       return true;
@@ -454,17 +457,56 @@ const av3d = (() => {
   }
   async function show() {
     const a = AV(), my = ++token;
-    $('#stage').classList.toggle('nophoto', a.id !== 'sanne');
+    $('#stage').classList.add('nophoto'); $('#stage').querySelector(':scope > img').src = a.thumb;
     if (!S.set.three) return hide();
     if (!(await boot()) || my !== token) return;
     if (shown !== a.id) {
       $('#stage').classList.remove('three');
-      try { await head.showAvatar({ url: a.model, lipsyncLang: 'en', ...a.opts }); shown = a.id; }
+      try { await head.showAvatar({ url: a.model, lipsyncLang: 'en', ...a.opts }); shown = a.id; hairSetup(); }
       catch { shown = null; return; }
       if (my !== token) return;
     }
     try { head.start(); } catch {}
     $('#stage').classList.add('three'); view($('#lesson').classList.contains('call'));
+  }
+  /* Hair: the models have no hair bones, so the strands are moved in the shader. The further a strand hangs
+     below the top of the head, the more it lags behind the head's movement, on a small damped spring. */
+  function hairSetup() {
+    hair.on = false;
+    try {
+      const meshes = []; hair.bone = null;
+      head.armature.traverse(o => { if (o.isBone && o.name === 'Head') hair.bone = o; if (o.isMesh && /hair/i.test(o.name)) meshes.push(o); });
+      if (!meshes.length || !hair.bone) return;
+      hair.u = { uSway: { value: new THREE.Vector3() }, uTopY: { value: 10 } };
+      hair.p = null; hair.v = new THREE.Vector3(); hair.x = new THREE.Vector3(); hair.tmp = new THREE.Vector3();
+      for (const m of meshes) for (const mat of (Array.isArray(m.material) ? m.material : [m.material])) {
+        mat.onBeforeCompile = sh => {
+          Object.assign(sh.uniforms, hair.u);
+          sh.vertexShader = 'uniform vec3 uSway;\nuniform float uTopY;\n' + sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
+            vec4 hwp = modelMatrix * vec4( transformed, 1.0 );
+            float hw = clamp( ( uTopY - hwp.y ) / 0.32, 0.0, 1.0 ); hw *= hw;
+            mvPosition += viewMatrix * vec4( uSway * hw, 0.0 );
+            gl_Position = projectionMatrix * mvPosition;`);
+        };
+        mat.needsUpdate = true;
+      }
+      hair.on = true;
+    } catch { hair.on = false; }
+  }
+  function hairTick(dt) {
+    if (!hair.on || !dt) return;
+    const h = hair, s = Math.min(0.05, dt / 1000); h.t += s;
+    h.bone.getWorldPosition(h.tmp);
+    h.u.uTopY.value = h.tmp.y + 0.04;                       // strands start moving a little below the crown
+    const f = new THREE.Vector3(0, 0, 0.12).applyQuaternion(h.bone.getWorldQuaternion(new THREE.Quaternion())).add(h.tmp); // a point in front of the face
+    if (!h.p) { h.p = f.clone(); return; }
+    const vel = f.clone().sub(h.p).divideScalar(s); h.p.copy(f);
+    const target = vel.multiplyScalar(-0.05); target.y *= 0.3; target.clampLength(0, 0.035);
+    target.x += Math.sin(h.t * 1.3) * 0.0015; target.z += Math.sin(h.t * 0.9 + 1) * 0.001;   // a hint of air
+    // damped spring towards the target
+    h.v.add(target.sub(h.x).multiplyScalar(90 * s)).multiplyScalar(Math.max(0, 1 - 9 * s));
+    h.x.add(h.v.clone().multiplyScalar(s));
+    h.u.uSway.value.copy(h.x);
   }
   function hide() { token++; $('#stage').classList.remove('three'); if (head) { try { head.stop(); } catch {} } }
   // call: waist-up so the hands are visible. lesson card: face only.
@@ -482,7 +524,7 @@ const av3d = (() => {
   }
   function mood(m) { if (!on()) return; try { head.setMood(m || AV().mood || 'neutral'); } catch {} }
   function look() { if (on()) { try { head.lookAtCamera(1200); } catch {} } }
-  return { show, hide, view, set, sentence, ended, react, mood, look, on, reactions: Object.keys(REACT), get head() { return head; },
+  return { show, hide, view, set, sentence, ended, react, mood, look, on, hair, reactions: Object.keys(REACT), get head() { return head; },
     peek: k => head && head.mtAvatar && head.mtAvatar[k] ? head.mtAvatar[k].value : null };
 })();
 
