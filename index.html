@@ -741,20 +741,21 @@ const face = (() => {
     // optional delay, for phones whose speaker plays a little after the signal is measured (set in the settings)
     const lag = S.set.lipDelay || 0;
     if (lag) { line.push([t, now]); while (line.length > 2 && line[1][0] <= t - lag) line.shift(); now = line[0][0] <= t - lag ? line[0][1] : 0; } else line.length = 0;
-    env = Math.max(now, env - dt * peak / 110);                 // hold through the tiny dips inside a syllable
+    const k = S.set.lipSpeed || 0.6;                             // 1 = lively, 0.4 = very calm (set in the settings)
+    env = Math.max(now, env - dt * peak * k / 130);              // hold through the dips inside a syllable
     peak = Math.max(now, peak * 0.9992, 0.02);
     let target = env < peak * 0.07 ? 0 : Math.pow(Math.min(1, (env / peak - 0.07) / 0.6), 0.85);
     if (!talking && L && L.conv) target = 0;
     const step = target - open;
-    if (Math.abs(step) > 0.04) open += Math.max(-dt / 210, Math.min(dt / 150, step));   // full opening takes at least 150 ms, closing 210 ms
+    if (Math.abs(step) > 0.06) open += Math.max(-dt * k / 210, Math.min(dt * k / 150, step));   // at speed 1: 150 ms to open fully, 210 ms to close
     // lip shape (rounded, neutral, stretched) comes from the recognised sound, and changes gently
     if (heard) shapeTo = vShape;
     else if (open > 0.18 && !wasOpen) shapeTo = Math.random() * 2;
     wasOpen = open > 0.18;
-    shape += (shapeTo - shape) * 0.08;
+    shape += (shapeTo - shape) * 0.08 * k;
 
     g.globalAlpha = 1; g.drawImage(base, 0, 0, CW, CH);
-    const f = open * (M.n - 1) * 0.78, k0 = Math.floor(f), k1 = Math.min(M.n - 1, k0 + 1), a = f - k0;
+    const f = open * (M.n - 1) * 0.7, k0 = Math.floor(f), k1 = Math.min(M.n - 1, k0 + 1), a = f - k0;
     const r0 = Math.min(M.rows - 1, Math.floor(shape)), r1 = Math.min(M.rows - 1, r0 + 1), rb = shape - r0;
     row(r0, k0, k1, a, g, M.x, M.y);
     if (rb > 0.03 && r1 !== r0) { row(r1, k0, k1, a, tg, 0, 0); g.globalAlpha = rb; g.drawImage(tmp, M.x, M.y); g.globalAlpha = 1; }
@@ -1279,6 +1280,7 @@ function renderSettings() {
     <div class="set"><div><b>Vitesse de la voix</b><span>Ralentis au début, accélère ensuite.</span></div><input type="range" id="rate" min="0.6" max="1.1" step="0.05" value="${s.rate}"></div>
     <div class="set"><div><b>Afficher les traductions</b><span>Désactive pour deviner avant de toucher la phrase.</span></div><button class="sw ${s.showTr ? 'on' : ''}" data-k="showTr" aria-label="Traductions"></button></div>
     <div class="set"><div><b>Débloquer tous les jours</b><span>Pour choisir librement dans le programme.</span></div><button class="sw ${s.unlockAll ? 'on' : ''}" data-k="unlockAll" aria-label="Débloquer"></button></div>
+    <div class="set"><div><b>Vitesse des lèvres</b><span>Vers la gauche, la bouche bouge plus lentement.</span></div><input type="range" id="lipSpeed" min="0.3" max="1" step="0.05" value="${s.lipSpeed || 0.6}"></div>
     <div class="set"><div><b>Retard des lèvres</b><span>Si la bouche bouge avant le son sur ton téléphone, augmente un peu. Actuel : ${s.lipDelay || 0} ms.</span></div><input type="range" id="lipDelay" min="0" max="300" step="20" value="${s.lipDelay || 0}"></div>
     <div class="set"><div><b>Tester la voix</b><span>La voix de ${esc(c.tutor)}, en ${esc(c.target.name)} puis en ${esc(c.native.name)}.</span></div><button class="btn ghost" id="testVoice">Écouter</button></div>
   </div>
@@ -1293,7 +1295,7 @@ $('#settingsBody').addEventListener('click', e => {
   if (e.target.closest('#editProfile')) return startOnb(true);
   if (e.target.closest('#reset') && confirm('Effacer toute ta progression ?')) { S = structuredClone(DEF); save(); R = null; startOnb(); toast('Progression effacée'); }
 });
-$('#settingsBody').addEventListener('change', e => { if (e.target.id === 'rate') { S.set.rate = +e.target.value; save(); } if (e.target.id === 'lipDelay') { S.set.lipDelay = +e.target.value; save(); renderSettings(); } });
+$('#settingsBody').addEventListener('change', e => { if (e.target.id === 'rate') { S.set.rate = +e.target.value; save(); } if (e.target.id === 'lipSpeed') { S.set.lipSpeed = +e.target.value; save(); } if (e.target.id === 'lipDelay') { S.set.lipDelay = +e.target.value; save(); renderSettings(); } });
 
 /* ---------- onboarding questionnaire ---------- */
 const OB = () => window.ONBOARDING[S.pair] || window.ONBOARDING['nl-fr'];
