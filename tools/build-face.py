@@ -4,7 +4,7 @@
 
 From the talking clip it picks mouth shapes (3 lip widths x 6 openings), aligns them on the first
 frame and writes them as a sprite sheet. From the idle clip it takes a half and a full blink.
-Outputs base.jpg, mouth.jpg, blink.jpg, face.json and preview.jpg in <out_dir>.
+Outputs base.jpg, mouth.webp, blink.jpg, face.json and preview.jpg in <out_dir>.
 
 Needs: pip install mediapipe opencv-python-headless numpy, and face_landmarker.task next to this
 script or in the working directory (https://storage.googleapis.com/mediapipe-models/face_landmarker/
@@ -59,16 +59,17 @@ for i, f in enumerate(talk):
 ops = np.array([r['op'] for r in rows]); wds = np.array([r['wd'] for r in rows])
 print('faces found in', len(rows), 'talk frames | opening', round(float(ops.min()), 3), 'to', round(float(ops.max()), 3))
 
-# mouth and chin region, with a soft elliptical mask so the patch melts into the base frame
-m = 0.06 * face_h
-xs = [rp[i][0] for i in (61, 291, 172, 397, 132, 361)]
+# lower face region (cheeks, nose, mouth, jaw: they all move when someone talks), with a soft elliptical mask
+# so the patch melts into the frame underneath
+m = 0.05 * face_h
+xs = [rp[i][0] for i in (234, 454, 172, 397, 132, 361)]
 x0, x1 = int(min(xs) - m), int(max(xs) + m)
-y0, y1 = int(rp[2][1] - 0.02 * face_h), int(min(H - 1, rp[152][1] + 0.16 * face_h))
+y0, y1 = int(rp[197][1] + 0.03 * face_h), int(min(H - 1, rp[152][1] + 0.18 * face_h))
 x0 -= x0 % 2; y0 -= y0 % 2; x1 += (x1 - x0) % 2; y1 += (y1 - y0) % 2
 pw, ph = x1 - x0, y1 - y0
 yy, xx = np.mgrid[0:ph, 0:pw].astype(np.float32)
-d = np.sqrt(((xx - pw / 2) / (pw / 2)) ** 2 + ((yy - ph * 0.45) / (ph * 0.55)) ** 2)
-mask = cv2.GaussianBlur(np.clip((1.0 - d) / 0.28, 0, 1), (0, 0), max(1.5, face_h / 60))[..., None]
+d = np.sqrt(((xx - pw / 2) / (pw / 2)) ** 2 + ((yy - ph * 0.52) / (ph * 0.5)) ** 2)
+mask = cv2.GaussianBlur(np.clip((1.0 - d) / 0.34, 0, 1), (0, 0), max(1.5, face_h / 50))[..., None]
 
 wt = [np.percentile(wds, 12), np.percentile(wds, 50), np.percentile(wds, 90)]     # rounded, neutral, wide lips
 ot = np.linspace(0, np.percentile(ops, 96), 6)                                    # closed to open
@@ -77,10 +78,9 @@ grid = []
 for wi, w in enumerate(wt):
     row = []
     for k, t in enumerate(ot):
-        if k == 0 and wi == 1: row.append(ref[y0:y1, x0:x1].copy()); continue
+        if k == 0 and wi == 1: row.append(ref[y0:y1, x0:x1].astype(np.float32)); continue
         best = min(rows, key=lambda r: ((r['op'] - t) / os_) ** 2 * 3 + ((r['wd'] - w) / ws) ** 2 + r['err'] * 0.6 + r['rot'] * 0.4)
-        a, b = best['a'][y0:y1, x0:x1].astype(np.float32), ref[y0:y1, x0:x1].astype(np.float32)
-        row.append(np.clip(a * mask + b * (1 - mask), 0, 255).astype(np.uint8))
+        row.append(best['a'][y0:y1, x0:x1].astype(np.float32))
     grid.append(row)
 
 # blink: eyes region from the idle clip
@@ -91,10 +91,14 @@ bw, bh = bx1 - bx0, by1 - by0
 yy, xx = np.mgrid[0:bh, 0:bw].astype(np.float32)
 d = np.maximum(np.abs(xx - bw / 2) / (bw / 2), np.abs(yy - bh / 2) / (bh / 2))
 bm = cv2.GaussianBlur(np.clip((1 - d) / 0.25, 0, 1), (0, 0), max(1.5, face_h / 70))[..., None]
+# where the face is in every frame of the idle loop, so the animated lower face can ride on the moving head
+track, last = [], [1.0, 0.0, 0.0, 0.0]
 irows = []
 for f in idle:
     r = analyse(f)
-    if r is None: continue
+    if r is None: track.append(last); continue
+    Mi, _ = cv2.estimateAffinePartial2D(rp[STABLE], r[0][STABLE], method=cv2.LMEDS)      # base frame -> this frame
+    last = [float(Mi[0, 0]), float(Mi[1, 0]), float(Mi[0, 2]), float(Mi[1, 2])]; track.append(last)
     a, _, err, _ = align(f, r[0])
     irows.append(dict(a=a, err=err / face_h * 100, bl=(r[1].get('eyeBlinkLeft', 0) + r[1].get('eyeBlinkRight', 0)) / 2))
 bl = np.array([r['bl'] for r in irows]); print('blink max', round(float(bl.max()), 2))
@@ -108,12 +112,19 @@ S = OUT_W / W
 sc = lambda im, w, h: cv2.resize(im, (w, h), interpolation=cv2.INTER_AREA)
 MW, MH, BW, BH = round(pw * S), round(ph * S), round(bw * S), round(bh * S)
 cv2.imwrite(f'{out}/base.jpg', sc(ref, OUT_W, round(H * S)), [cv2.IMWRITE_JPEG_QUALITY, 86])
-cv2.imwrite(f'{out}/mouth.jpg', np.vstack([np.hstack([sc(p, MW, MH) for p in row]) for row in grid]), [cv2.IMWRITE_JPEG_QUALITY, 90])
+# the sheet is transparent towards the edge of each patch, so it fades into whatever frame is underneath
+alpha = (sc(mask[..., 0], MW, MH) * 255).astype(np.uint8)
+cell = lambda p: np.dstack([sc(np.clip(p, 0, 255).astype(np.uint8), MW, MH), alpha])
+cv2.imwrite(f'{out}/mouth.webp', np.vstack([np.hstack([cell(p) for p in row]) for row in grid]), [cv2.IMWRITE_WEBP_QUALITY, 92])
 cv2.imwrite(f'{out}/blink.jpg', np.hstack([sc(p, BW, BH) for p in bp]), [cv2.IMWRITE_JPEG_QUALITY, 90])
-meta = dict(w=OUT_W, h=round(H * S), mouth=dict(x=round(x0 * S), y=round(y0 * S), w=MW, h=MH, n=6, rows=3),
+tr = np.array(track); k = np.ones(5) / 5                                    # light smoothing against tracking jitter
+tr = np.stack([np.convolve(np.pad(tr[:, j], 2, mode='wrap'), k, mode='valid') for j in range(4)], 1)
+fps = cv2.VideoCapture(idle_path).get(cv2.CAP_PROP_FPS) or 24
+meta = dict(w=OUT_W, h=round(H * S), fps=round(float(fps), 3),
+            track=[[round(float(a), 5), round(float(b), 5), round(float(tx) * S, 2), round(float(ty) * S, 2)] for a, b, tx, ty in tr], mouth=dict(x=round(x0 * S), y=round(y0 * S), w=MW, h=MH, n=6, rows=3),
             blink=dict(x=round(bx0 * S), y=round(by0 * S), w=BW, h=BH),
             face=dict(x=round(float(rp[:, 0].min()) * S), y=round(float(rp[10][1] - 0.35 * face_h) * S), w=round(float(rp[:, 0].max() - rp[:, 0].min()) * S), h=round(face_h * 1.5 * S)))
-json.dump(meta, open(f'{out}/face.json', 'w')); print(meta)
+json.dump(meta, open(f'{out}/face.json', 'w')); print({k: v for k, v in meta.items() if k != 'track'}, 'track', len(track))
 
 # preview of every mouth shape and the closed eyes, composited on the base frame
 cx0, cx1 = int(max(0, rp[:, 0].min() - 0.3 * face_h)), int(min(W, rp[:, 0].max() + 0.3 * face_h))
@@ -121,6 +132,6 @@ cy0, cy1 = int(max(0, rp[10][1] - 0.4 * face_h)), int(min(H, rp[152][1] + 0.4 * 
 prev = []
 for row in grid:
     for p in row:
-        f = ref.copy(); f[y0:y1, x0:x1] = p; prev.append(cv2.resize(f[cy0:cy1, cx0:cx1], (220, 260)))
+        f = ref.copy(); f[y0:y1, x0:x1] = np.clip(p * mask + ref[y0:y1, x0:x1] * (1 - mask), 0, 255).astype(np.uint8); prev.append(cv2.resize(f[cy0:cy1, cx0:cx1], (220, 260)))
 f = ref.copy(); f[by0:by1, bx0:bx1] = bp[1]; blink_prev = cv2.resize(f[cy0:cy1, cx0:cx1], (220, 260))
 cv2.imwrite(f'{out}/preview.jpg', np.vstack([np.hstack(prev[i * 6:(i + 1) * 6]) for i in range(3)] + [np.hstack([blink_prev] + [np.zeros((260, 220, 3), np.uint8)] * 5)]))

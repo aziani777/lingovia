@@ -81,7 +81,7 @@ h1,h2,h3{margin:0;line-height:1.15;letter-spacing:-.01em}
 .stage.reacting #vReact{opacity:1}
 .stage.vid>img,.stage.vid #vIdle,.stage.vid #face,.stage.vid #vReact{object-fit:cover;object-position:50% 16%}
 #lesson.call .stage.vid>img,#lesson.call .stage.vid #vIdle,#lesson.call .stage.vid #face,#lesson.call .stage.vid #vReact{object-position:50% 30%}
-.stage video,.stage>img{transform:scale(1.035)}
+.stage video,.stage>img,.stage #face{transform:scale(1.035)}
 .stage #av3d{position:absolute;inset:0;opacity:0;pointer-events:none;transition:opacity .35s;overflow:hidden;background:radial-gradient(120% 90% at 50% 35%,#f7efe2 0%,#e7ddcb 45%,#b9cfc9 100%)}
 .stage #av3d canvas{position:absolute;inset:0}
 .stage.three #av3d{opacity:1}
@@ -611,6 +611,7 @@ const av3d = (() => {
 /* ---------- face: mouth shapes driven by the voice ---------- */
 const face = (() => {
   // sprite sheet: 3 rows (rounded, neutral, wide lips) x 6 columns (closed to open)
+  let track = null, fps = 24, vfTime = -1;
   let M = null, B = null, CW = 540, CH = 960, base = null, mouth = null, blink = null, loaded = '', clips = {}, pending = null, reactEnd = 0;
   const cv = $('#face'), g = cv.getContext('2d');
   const tmp = document.createElement('canvas'), tg = tmp.getContext('2d');
@@ -624,13 +625,15 @@ const face = (() => {
     stage.querySelector(':scope > img').src = v.dir + 'base.jpg';
     const idle = $('#vIdle'); if (!idle.src.endsWith(v.dir + 'idle.mp4')) { idle.poster = v.dir + 'base.jpg'; idle.src = v.dir + 'idle.mp4'; }
     idle.play().catch(() => {});
+    // which frame of the loop is on screen right now, so the drawn face lands exactly on the head
+    if (idle.requestVideoFrameCallback && !idle._vf) { idle._vf = true; const cb = (n, md) => { vfTime = md.mediaTime; idle.requestVideoFrameCallback(cb); }; idle.requestVideoFrameCallback(cb); }
     clips = v.clips || {};
     if (loaded === a.id) return;
     try {
       const meta = await (await fetch(v.dir + 'face.json')).json();
       CW = meta.w; CH = meta.h; cv.width = CW; cv.height = CH; tmp.width = meta.mouth.w; tmp.height = meta.mouth.h;
-      base = img(v.dir + 'base.jpg'); mouth = img(v.dir + 'mouth.jpg'); blink = img(v.dir + 'blink.jpg');
-      M = meta.mouth; B = meta.blink; loaded = a.id;
+      base = img(v.dir + 'base.jpg'); mouth = img(v.dir + 'mouth.webp'); blink = img(v.dir + 'blink.jpg');
+      M = meta.mouth; B = meta.blink; track = meta.track || null; fps = meta.fps || 24; loaded = a.id;
       for (const c of Object.values(clips)) fetch(v.dir + c).catch(() => {});   // warm the cache
     } catch { M = null; }
   }
@@ -754,21 +757,18 @@ const face = (() => {
     wasOpen = open > 0.18;
     shape += (shapeTo - shape) * 0.08 * k;
 
-    g.globalAlpha = 1; g.drawImage(base, 0, 0, CW, CH);
+    /* The idle loop keeps playing underneath: it gives the breathing, the blinks and the head movement. Only the
+       lower face (cheeks, nose, mouth, jaw) is drawn here, and it rides on the head using the loop's face track. */
+    g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.clearRect(0, 0, CW, CH);
+    if (track) {
+      const idle = $('#vIdle'), i = Math.max(0, Math.min(track.length - 1, Math.round((vfTime >= 0 ? vfTime : idle.currentTime) * fps)));
+      const q = track[i]; g.setTransform(q[0], q[1], -q[1], q[0], q[2], q[3]);
+    }
     const f = open * (M.n - 1) * 0.7, k0 = Math.floor(f), k1 = Math.min(M.n - 1, k0 + 1), a = f - k0;
     const r0 = Math.min(M.rows - 1, Math.floor(shape)), r1 = Math.min(M.rows - 1, r0 + 1), rb = shape - r0;
     row(r0, k0, k1, a, g, M.x, M.y);
-    if (rb > 0.03 && r1 !== r0) { row(r1, k0, k1, a, tg, 0, 0); g.globalAlpha = rb; g.drawImage(tmp, M.x, M.y); g.globalAlpha = 1; }
-    if (blink.complete) {
-      if (t > nextBlink) { blinkAt = t; nextBlink = t + 2400 + Math.random() * 3200; }
-      const b = t - blinkAt;
-      if (blinkAt >= 0 && b < 210) g.drawImage(blink, (b > 60 && b < 150 ? 1 : 0) * B.w, 0, B.w, B.h, B.x, B.y, B.w, B.h);
-    }
-    // a little head movement while she talks, eased in and out
-    live += (($('#stage').classList.contains('talking') ? 1 : 0) - live) * 0.06;
-    const x = (Math.sin(t / 3900) * 2.4 + Math.sin(t / 1700) * 0.6) * live, y = (Math.sin(t / 4700 + 1) * 1.6 + open * 0.8) * live;
-    const rot = (Math.sin(t / 5300 + 2) * 0.35) * live;
-    cv.style.transform = `translate(${x.toFixed(2)}px,${y.toFixed(2)}px) rotate(${rot.toFixed(3)}deg) scale(1.035)`;
+    if (rb > 0.03 && r1 !== r0) { tg.clearRect(0, 0, M.w, M.h); row(r1, k0, k1, a, tg, 0, 0); g.globalAlpha = rb; g.drawImage(tmp, M.x, M.y); g.globalAlpha = 1; }
+    g.setTransform(1, 0, 0, 1, 0, 0);
   }
   function start() { if (!raf) { nextBlink = performance.now() + 1500; raf = requestAnimationFrame(frame); } }
   function stop() { cancelAnimationFrame(raf); raf = 0; open = 0; live = 0; }

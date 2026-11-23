@@ -7,7 +7,8 @@ set -e
 id=$1; work=$2; root=$(cd "$(dirname "$0")/.." && pwd); out=$root/assets/avatars/$id
 mkdir -p "$out"
 (cd "$work" && python3 "$root/tools/build-face.py" talk_raw.mp4 idle_raw.mp4 face 540 2>&1 | grep -E "^(frames|faces|blink|\{)")
-cp "$work"/face/{base.jpg,mouth.jpg,blink.jpg,face.json} "$out"/
+rm -f "$out/mouth.jpg"
+cp "$work"/face/{base.jpg,mouth.webp,blink.jpg,face.json} "$out"/
 for n in idle wave thumbs laugh; do
   [ -f "$work/${n}_raw.mp4" ] && ffmpeg -y -loglevel error -i "$work/${n}_raw.mp4" -an -vf scale=540:-2 -c:v libx264 -crf 27 -preset slow -pix_fmt yuv420p -movflags +faststart "$out/$n.mp4"
 done

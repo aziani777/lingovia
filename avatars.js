@@ -1,6 +1,6 @@
 // Lingovia tutors. To add one: append an entry here, drop its model, thumbnail and sample in assets/avatars/,
 // and add its voice ids to the allow-list in api/speak.js.
-// video   : a tutor drawn from generated footage instead of a 3D model. dir holds base.jpg, mouth.jpg, blink.jpg, face.json
+// video   : a tutor drawn from generated footage instead of a 3D model. dir holds base.jpg, mouth.webp, blink.jpg, face.json
 //           (made by tools/build-face.py), idle.mp4 and the reaction clips listed in clips.
 // model   : optional rigged GLB with ARKit + Oculus viseme blend shapes, for a 3D tutor instead of a video one (with opts, tint)
 // voice   : ElevenLabs voice id for the live call and phrase playback. voiceBE is used for Belgian Dutch.
