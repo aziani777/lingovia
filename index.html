@@ -1278,7 +1278,6 @@ function renderSettings() {
     <div class="set"><div><b>Cours</b><span>${esc(c.target.name)} depuis le ${esc(c.native.name)}. D'autres langues arrivent.</span></div></div>
     <div class="set"><div><b>Vitesse de la voix</b><span>Ralentis au début, accélère ensuite.</span></div><input type="range" id="rate" min="0.6" max="1.1" step="0.05" value="${s.rate}"></div>
     <div class="set"><div><b>Afficher les traductions</b><span>Désactive pour deviner avant de toucher la phrase.</span></div><button class="sw ${s.showTr ? 'on' : ''}" data-k="showTr" aria-label="Traductions"></button></div>
-    <div class="set"><div><b>Avatar 3D</b><span>Personnage animé avec lèvres synchronisées. Désactive pour revenir à la photo.</span></div><button class="sw ${s.three ? 'on' : ''}" data-k="three" aria-label="Avatar 3D"></button></div>
     <div class="set"><div><b>Débloquer tous les jours</b><span>Pour choisir librement dans le programme.</span></div><button class="sw ${s.unlockAll ? 'on' : ''}" data-k="unlockAll" aria-label="Débloquer"></button></div>
     <div class="set"><div><b>Retard des lèvres</b><span>Si la bouche bouge avant le son sur ton téléphone, augmente un peu. Actuel : ${s.lipDelay || 0} ms.</span></div><input type="range" id="lipDelay" min="0" max="300" step="20" value="${s.lipDelay || 0}"></div>
     <div class="set"><div><b>Tester la voix</b><span>La voix de ${esc(c.tutor)}, en ${esc(c.target.name)} puis en ${esc(c.native.name)}.</span></div><button class="btn ghost" id="testVoice">Écouter</button></div>

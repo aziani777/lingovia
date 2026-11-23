@@ -14,7 +14,7 @@ Premier cours: néerlandais depuis le français.
 - `vendor/elevenlabs-client.js` : SDK navigateur ElevenLabs 1.37.1
 - `vendor/headaudio/` : HeadAudio 1.1.0 (MIT), détection des sons pour la synchro des lèvres
 - `vendor/talkinghead/`, `vendor/three/` : TalkingHead 1.8.2 et three.js 0.187 (MIT), avatar 3D
-- `assets/avatars/*.glb` : modèles 3D d'exemple de TalkingHead (Avaturn, AvatarSDK, Ready Player Me), licences non commerciales. Visuels provisoires, à remplacer avant toute exploitation commerciale
+- `assets/avatars/<prof>/` : images, sprites de bouche et clips de chaque prof, générés avec Higgsfield puis préparés par `tools/make-tutor.sh`
 - `avatars.js` : les profs (prénom, caractère, voix, modèle 3D, extrait audio)
 - `onboarding.js` : contenu du questionnaire d'accueil, par paire de langues
 - `tools/build-face.py` : extrait les positions de bouche et de clignement depuis les vidéos de l'avatar
