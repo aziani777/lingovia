@@ -662,7 +662,8 @@ const face = (() => {
         HA = HA || import('/vendor/headaudio/headaudio.min.mjs');
         const { HeadAudio } = await HA;
         await ctx.audioWorklet.addModule('/vendor/headaudio/headworklet.min.mjs');
-        const node = new HeadAudio(ctx, { visemeMinMs: 100, visemeRampMs: 110, parameterData: { vadGateActiveDb: -40, vadGateInactiveDb: -60 } });
+        // each mouth shape is held and eased in, so the lips do not flicker
+        const node = new HeadAudio(ctx, { visemeMinMs: 190, visemeRampMs: 180, parameterData: { vadGateActiveDb: -40, vadGateInactiveDb: -60 } });
         await node.loadModel('/vendor/headaudio/model-en-mixed.bin');
         h = { node, w: {}, an: new WeakSet() };
         node.onvalue = (k, v) => { h.w[k] = v; av3d.set(k, v); };
@@ -679,9 +680,9 @@ const face = (() => {
     try { head.node.update(dt); } catch { return false; }
     let sum = 0, r = 0, k = 0;
     for (const n in VIS) { const w = head.w[n] || 0; if (w > 0.01) { sum += w; r += w * VIS[n][0]; k += w * VIS[n][1]; } }
-    if (sum < 0.05) { vOpen += (0 - vOpen) * 0.25; return true; }
+    if (sum < 0.05) { vOpen += (0 - vOpen) * 0.14; return true; }
     const strength = Math.min(1, sum / 0.6);
-    vOpen += (k / sum * strength - vOpen) * 0.4; vShape += (r / sum - vShape) * 0.3;
+    vOpen += (k / sum * strength * 0.85 - vOpen) * 0.17; vShape += (r / sum - vShape) * 0.1;
     return true;
   }
 
