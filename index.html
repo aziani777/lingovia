@@ -860,6 +860,7 @@ const scrollDown = () => requestAnimationFrame(() => chat.scrollTop = chat.scrol
 function add(html, cls) { const d = document.createElement('div'); d.className = cls; d.innerHTML = html; chat.appendChild(d); scrollDown(); return d; }
 
 function openLesson(d, trial) {
+  setTimeout(() => simli.warm(), 0);   // connect the live face while the learner reads the lesson card
   const info = dayInfo(d);
   L = { info, history: [], turns: 0, mode: 'ai', step: 0, expect: null, complete: false, learned: [], busy: false, started: false, conv: null, log: [], fixes: [], t0: 0, reported: false, trial: !!trial, limit: trial ? 120 : 0 };
   loadSDK();
@@ -922,6 +923,8 @@ const simli = {
   cl: null, on: false, lib: null,
   load() { return this.lib || (this.lib = new Promise(res => { const el = document.createElement('script'); el.src = '/vendor/simli-client.js';
     el.onload = () => res(!!window.Simli); el.onerror = () => { this.lib = null; res(false); }; document.head.appendChild(el); })); },
+  // Starts connecting ahead of the call (it takes several seconds), or returns the connection already under way.
+  warm() { if (!L || L.conv) return Promise.resolve(false); if (this.pending && this.for === L) return this.pending; if (this.cl) this.stop(); this.for = L; return this.pending = this.prepare(L); },
   // Opens the Simli session. Called while the call is still connecting, so the live face is ready for the first sentence.
   async prepare(mine) {
     const id = new URLSearchParams(location.search).get('simli') || AV().simli;
@@ -953,7 +956,7 @@ const simli = {
     } catch (e) { console.warn('simli', e); this.stop(conv); }
   },
   stop(conv) {
-    const cl = this.cl; this.cl = null;
+    const cl = this.cl; this.cl = null; this.pending = null;
     if (this.on && conv && L && L.conv === conv) directVoice(conv, !L.quiet);
     this.on = this.ready = false; $('#stage').classList.remove('simli'); $('#liveTag').hidden = true;
     try { if (this.an && this.dest) this.an.disconnect(this.dest); } catch {} this.an = this.dest = null;
@@ -1030,7 +1033,7 @@ async function startCall(resume) { try { return await startCall0(resume); } catc
 async function startCall0(resume) {
   const mine = L, i = L.info, av = AV();
   setState('connecting');
-  const live = simli.prepare(mine);
+  const live = simli.warm();
   const [ok, r] = await Promise.all([loadSDK(), fetch('/api/session', { method: 'POST' })]);
   if (!ok || !r.ok) throw new Error('unavailable');
   const { token, signedUrl } = await r.json();
@@ -1078,7 +1081,7 @@ async function startCall0(resume) {
   };
   const C2 = window.ElevenLabsClient.Conversation;
   // give the live face up to 8 s to be ready, so the tutor is lip-synced from the very first word
-  await Promise.race([live, new Promise(r => setTimeout(r, 8000))]);
+  await Promise.race([live, new Promise(r => setTimeout(r, 10000))]);
   if (L !== mine) { simli.stop(); return; }
   let conv;
   try { if (!token) throw new Error('no token'); conv = await C2.startSession({ conversationToken: token, connectionType: 'webrtc', ...opts }); }
