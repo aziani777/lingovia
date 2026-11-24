@@ -751,7 +751,7 @@ const face = (() => {
       const on = t - lastVoice < 260 && lastVoice > 0 && !stage0.classList.contains('reacting');
       if (on !== voiced) {
         voiced = on; stage0.classList.toggle('voiced', on);
-        if (on) lv2.play().catch(() => {}); else setTimeout(() => { if (!voiced) lv2.pause(); }, 220);
+        if (on) { lv2.playbackRate = 0.6 + 0.4 * (S.set.lipSpeed || 0.6); lv2.play().catch(() => {}); } else setTimeout(() => { if (!voiced) lv2.pause(); }, 220);
       }
       // a new sentence after a real silence starts on the next clip, for variety
       if (!on && lastVoice && t - lastVoice > 1500 && talkClips.length > 1 && !lv2._swapped) { lv2._swapped = true; talkAt = (talkAt + 1) % talkClips.length; lv2.src = talkClips[talkAt]; lv2.load(); }
@@ -1312,7 +1312,7 @@ function renderSettings() {
     <div class="set"><div><b>Vitesse de la voix</b><span>Ralentis au début, accélère ensuite.</span></div><input type="range" id="rate" min="0.6" max="1.1" step="0.05" value="${s.rate}"></div>
     <div class="set"><div><b>Afficher les traductions</b><span>Désactive pour deviner avant de toucher la phrase.</span></div><button class="sw ${s.showTr ? 'on' : ''}" data-k="showTr" aria-label="Traductions"></button></div>
     <div class="set"><div><b>Débloquer tous les jours</b><span>Pour choisir librement dans le programme.</span></div><button class="sw ${s.unlockAll ? 'on' : ''}" data-k="unlockAll" aria-label="Débloquer"></button></div>
-    <div class="set"><div><b>Vitesse des lèvres</b><span>Vers la gauche, la bouche bouge plus lentement.</span></div><input type="range" id="lipSpeed" min="0.3" max="1" step="0.05" value="${s.lipSpeed || 0.6}"></div>
+    <div class="set"><div><b>Vitesse des lèvres</b><span>Vers la gauche, le prof parle avec des gestes plus lents.</span></div><input type="range" id="lipSpeed" min="0.3" max="1" step="0.05" value="${s.lipSpeed || 0.6}"></div>
     <div class="set"><div><b>Retard des lèvres</b><span>Si la bouche bouge avant le son sur ton téléphone, augmente un peu. Actuel : ${s.lipDelay || 0} ms.</span></div><input type="range" id="lipDelay" min="0" max="300" step="20" value="${s.lipDelay || 0}"></div>
     <div class="set"><div><b>Tester la voix</b><span>La voix de ${esc(c.tutor)}, en ${esc(c.target.name)} puis en ${esc(c.native.name)}.</span></div><button class="btn ghost" id="testVoice">Écouter</button></div>
   </div>
