@@ -79,6 +79,9 @@ h1,h2,h3{margin:0;line-height:1.15;letter-spacing:-.01em}
 .stage.talking #face{opacity:1}
 .stage #vLive{opacity:0;transition:opacity .28s}
 .stage.talking.haslive #vLive{opacity:1}
+.stage.hastalk #vLive{opacity:0;transition:opacity .16s}
+.stage.hastalk.voiced #vLive{opacity:1}
+.stage.hastalk #face{display:none}
 .stage #vReact{opacity:0;transition:opacity .22s;pointer-events:none}
 .stage.reacting #vReact{opacity:1}
 .stage.vid>img,.stage.vid #vIdle,.stage.vid #vLive,.stage.vid #face,.stage.vid #vReact{object-fit:cover;object-position:50% 16%}
@@ -615,6 +618,7 @@ const av3d = (() => {
 const face = (() => {
   // sprite sheet: 3 rows (rounded, neutral, wide lips) x 6 columns (closed to open)
   let track = null, fps = 24, vfTime = -1, live = null, liveTime = -1, wasTalking = false;
+  let talkClips = [], talkAt = 0, lastVoice = 0, voiced = false;
   let M = null, B = null, CW = 540, CH = 960, base = null, mouth = null, blink = null, loaded = '', clips = {}, pending = null, reactEnd = 0;
   const cv = $('#face'), g = cv.getContext('2d');
   const tmp = document.createElement('canvas'), tg = tmp.getContext('2d');
@@ -623,7 +627,7 @@ const face = (() => {
   async function use(a) {
     const stage = $('#stage'), v = a && a.video;
     stage.classList.toggle('vid', !!v); stage.classList.remove('reacting'); pending = null;
-    if (!v) { loaded = ''; M = null; live = null; stage.classList.remove('haslive'); return; }
+    if (!v) { loaded = ''; M = null; live = null; talkClips = []; stage.classList.remove('haslive', 'hastalk', 'voiced'); return; }
     stage.classList.remove('nophoto', 'three');
     stage.querySelector(':scope > img').src = v.dir + 'base.jpg';
     const idle = $('#vIdle'); if (!idle.src.endsWith(v.dir + 'idle.mp4')) { idle.poster = v.dir + 'base.jpg'; idle.src = v.dir + 'idle.mp4'; }
@@ -637,9 +641,12 @@ const face = (() => {
       CW = meta.w; CH = meta.h; cv.width = CW; cv.height = CH; tmp.width = meta.mouth.w; tmp.height = meta.mouth.h;
       base = img(v.dir + 'base.jpg'); mouth = img(v.dir + 'mouth.webp'); blink = img(v.dir + 'blink.jpg');
       M = meta.mouth; B = meta.blink; track = meta.track || null; fps = meta.fps || 24; loaded = a.id;
-      live = v.live && meta.live ? meta.live : null;
+      talkClips = (v.talk || []).map(f => v.dir + f); talkAt = 0;
+      stage.classList.toggle('hastalk', talkClips.length > 0); stage.classList.remove('voiced');
+      live = !talkClips.length && v.live && meta.live ? meta.live : null;
       const lv = $('#vLive'); stage.classList.toggle('haslive', !!live);
-      if (live) { lv.src = v.dir + v.live; lv.load(); if (lv.requestVideoFrameCallback && !lv._vf) { lv._vf = true; const cb = (n, md) => { liveTime = md.mediaTime; lv.requestVideoFrameCallback(cb); }; lv.requestVideoFrameCallback(cb); } } else lv.removeAttribute('src');
+      if (talkClips.length) { lv.src = talkClips[0]; lv.load(); for (const c of talkClips) fetch(c).catch(() => {}); }
+      if (live) { lv.src = v.dir + v.live; lv.load(); if (lv.requestVideoFrameCallback && !lv._vf) { lv._vf = true; const cb = (n, md) => { liveTime = md.mediaTime; lv.requestVideoFrameCallback(cb); }; lv.requestVideoFrameCallback(cb); } } else if (!talkClips.length) lv.removeAttribute('src');
       for (const c of Object.values(clips)) fetch(v.dir + c).catch(() => {});   // warm the cache
     } catch { M = null; }
   }
@@ -735,6 +742,22 @@ const face = (() => {
     const stage0 = $('#stage');
     if (pending && !stage0.classList.contains('talking')) { const q = pending; pending = null; if (t - q.t < 9000) react(q.name); }
     if (stage0.classList.contains('reacting') && (t > reactEnd || (stage0.classList.contains('talking') && $('#vReact').currentTime > 2.2))) stage0.classList.remove('reacting');
+    /* Tutors with real talking footage: the whole talking video (face, mouth, expression all filmed together) is shown
+       exactly while her voice sounds, and the quiet idle loop the rest of the time. Nothing is drawn on top. */
+    if (talkClips.length) {
+      const tk = stage0.classList.contains('talking'), lvl = tk || (!player.paused && !(L && L.conv)) ? rms() : 0, lv2 = $('#vLive');
+      peak = Math.max(lvl, peak * 0.9992, 0.02);
+      if (lvl > peak * 0.08) lastVoice = t;
+      const on = t - lastVoice < 260 && lastVoice > 0 && !stage0.classList.contains('reacting');
+      if (on !== voiced) {
+        voiced = on; stage0.classList.toggle('voiced', on);
+        if (on) lv2.play().catch(() => {}); else setTimeout(() => { if (!voiced) lv2.pause(); }, 220);
+      }
+      // a new sentence after a real silence starts on the next clip, for variety
+      if (!on && lastVoice && t - lastVoice > 1500 && talkClips.length > 1 && !lv2._swapped) { lv2._swapped = true; talkAt = (talkAt + 1) % talkClips.length; lv2.src = talkClips[talkAt]; lv2.load(); }
+      if (on) lv2._swapped = false;
+      return;
+    }
     if (!M || !base.complete || !mouth.complete) return;
     const dt = Math.min(100, lastT ? t - lastT : 16); lastT = t;
     const [v, c] = listen(t);

@@ -1,7 +1,8 @@
 // Lingovia tutors. To add one: append an entry here, drop its model, thumbnail and sample in assets/avatars/,
 // and add its voice ids to the allow-list in api/speak.js.
 // video   : a tutor drawn from generated footage instead of a 3D model. dir holds base.jpg, mouth.webp, blink.jpg, face.json
-//           (made by tools/build-face.py), idle.mp4, live.mp4 (body language while talking) and the reaction clips listed in clips.
+//           (made by tools/build-face.py), idle.mp4, the reaction clips listed in clips, and either talk (real talking footage, played while the voice
+//           sounds) or live.mp4 (body language loop with a drawn mouth, the older method).
 // model   : optional rigged GLB with ARKit + Oculus viseme blend shapes, for a 3D tutor instead of a video one (with opts, tint)
 // voice   : ElevenLabs voice id for the live call and phrase playback. voiceBE is used for Belgian Dutch.
 // sample  : audio preview played in the tutor picker (assets/avatars/<id>.mp3 says sampleText)
@@ -16,7 +17,7 @@
       persona: '32, a Dutch teacher from Utrecht who lives in Amsterdam. Warm, patient and encouraging: you put the learner at ease and celebrate small wins. You love cycling and good coffee',
       voice: 'OlBRrVAItyi00MuGMbna', voiceBE: 'g7B5PNoscIXomLNUmHAb',
       sampleText: 'Hallo, ik ben Sanne! Avec moi, on prend le temps. On avance ensemble, tranquillement.',
-      video: { dir: '/assets/avatars/sanne/', live: 'live.mp4', clips: { wave: 'wave.mp4', thumbs_up: 'thumbs.mp4', laugh: 'laugh.mp4' } } }),
+      video: { dir: '/assets/avatars/sanne/', talk: ['talk1.mp4'], live: 'live.mp4', clips: { wave: 'wave.mp4', thumbs_up: 'thumbs.mp4', laugh: 'laugh.mp4' } } }),
     t('emma', { style: 'fun', tags: ['Enjouée', 'Drôle', 'Rapide'], name: 'Emma', gender: 'F', age: 24, trait: 'Dynamique',
       bio: 'Vive et drôle. Elle te fait parler vite et beaucoup.',
       persona: '24, a student from Rotterdam who tutors on the side. Energetic, funny and quick: you keep the learner talking and laughing, and you tease gently. You love festivals and street food',
