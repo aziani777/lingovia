@@ -326,7 +326,7 @@ input[type=range]{width:120px;accent-color:var(--accent)}
         <button class="pill" id="endBtn" hidden>Terminer</button>
         <button class="pill" id="helpBtn" hidden>Aide</button>
       </div>
-      <div class="who"><b id="tutorName">Sanne</b><span><i class="dot"></i><em id="status" style="font-style:normal">À l'écoute</em><em id="timer" style="font-style:normal"></em></span></div>
+      <div class="who"><b id="tutorName">Sanne</b><span><i class="dot"></i><em id="status" style="font-style:normal">À l'écoute</em><em id="timer" style="font-style:normal"></em><em id="liveTag" hidden style="font-style:normal;margin-left:6px;padding:1px 6px;border-radius:6px;background:#e5484d;color:#fff;font-size:10px;font-weight:700;letter-spacing:.04em">LIVE</em></span></div>
       <div class="orb" id="orb"><i></i><b></b></div>
       <video class="pip" id="pip" playsinline muted hidden></video>
       <div class="lost" id="lost" hidden><div><b>Connexion perdue</b><p>L'appel a été coupé. Ta conversation est conservée.</p>
@@ -913,6 +913,11 @@ function loadSDK() {
 /* Live lip sync (Simli): the tutor's voice is streamed to Simli, which sends back a video of their face saying
    exactly those words, together with the audio in sync. It starts in the background once the call is up and takes
    over between two sentences. If anything fails, the call simply continues with the tutor's own talking videos. */
+// Silences or restores the tutor's direct voice. iPhones ignore the volume of an audio element, so the elements are muted too.
+function directVoice(conv, on) {
+  try { conv.setVolume({ volume: on ? 1 : 0 }); } catch {}
+  for (const a of document.body.children) if (a.tagName === 'AUDIO' && !a.id) a.muted = !on;
+}
 const simli = {
   cl: null, on: false, lib: null,
   load() { return this.lib || (this.lib = new Promise(res => { const el = document.createElement('script'); el.src = '/vendor/simli-client.js';
@@ -923,7 +928,7 @@ const simli = {
     try {
       const an = conv.output && conv.output.getAnalyser && conv.output.getAnalyser(); if (!an) return;
       const [ok, r] = await Promise.all([this.load(), fetch('/api/simli', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ faceId: id }) })]);
-      if (!ok || !r.ok) { console.warn('simli unavailable', r.status, await r.text().catch(() => '')); return; }
+      if (!ok || !r.ok) { const why = ok ? ((await r.json().catch(() => ({}))).error || r.status) : 'script'; console.warn('simli unavailable', why); toast('Visage en direct indisponible : ' + String(why).slice(0, 80)); return; }
       const { token } = await r.json();
       if (L !== mine || L.conv !== conv) return;
       const cl = this.cl = new Simli.SimliClient(token, $('#vSimli'), $('#aSimli'), null, Simli.LogLevel.ERROR);
@@ -935,14 +940,14 @@ const simli = {
       if (L !== mine || L.conv !== conv || this.cl !== cl) { if (this.cl === cl) this.stop(); return; }
       this.dest = an.context.createMediaStreamDestination(); this.an = an; an.connect(this.dest);
       cl.listenToMediastreamTrack(this.dest.stream.getAudioTracks()[0]);
-      conv.setVolume({ volume: 0 }); $('#aSimli').muted = !!L.quiet;
-      this.on = true; $('#stage').classList.add('simli');
-    } catch (e) { console.warn('simli', e); this.stop(conv); }
+      directVoice(conv, false); $('#aSimli').muted = !!L.quiet; $('#aSimli').play().catch(() => {});
+      this.on = true; $('#stage').classList.add('simli'); $('#liveTag').hidden = false;
+    } catch (e) { console.warn('simli', e); toast('Visage en direct indisponible : ' + String(e && e.message || e).slice(0, 80)); this.stop(conv); }
   },
   stop(conv) {
     const cl = this.cl; this.cl = null;
-    if (this.on && conv && L && L.conv === conv) { try { conv.setVolume({ volume: L.quiet ? 0 : 1 }); } catch {} }
-    this.on = false; $('#stage').classList.remove('simli');
+    if (this.on && conv && L && L.conv === conv) directVoice(conv, !L.quiet);
+    this.on = false; $('#stage').classList.remove('simli'); $('#liveTag').hidden = true;
     try { if (this.an && this.dest) this.an.disconnect(this.dest); } catch {} this.an = this.dest = null;
     if (cl) { try { Promise.resolve(cl.stop()).catch(() => {}); } catch {} }
   },
@@ -1163,7 +1168,7 @@ async function translate(el) {
 }
 $('#muteBtn').addEventListener('click', () => { if (!L || !L.conv) return; L.muted = !L.muted; try { L.conv.setMicMuted(L.muted); } catch {} paintCall(); toast(L.muted ? 'Micro coupé' : 'Micro activé'); });
 $('#camBtn').addEventListener('click', async () => { if (cam) { camOff(); paintCall(); } else await camOn(); });
-$('#spkBtn').addEventListener('click', () => { if (!L || !L.conv) return; L.quiet = !L.quiet; try { if (simli.on) $('#aSimli').muted = L.quiet; else L.conv.setVolume({ volume: L.quiet ? 0 : 1 }); } catch {} paintCall(); toast(L.quiet ? 'Son coupé' : 'Son activé'); });
+$('#spkBtn').addEventListener('click', () => { if (!L || !L.conv) return; L.quiet = !L.quiet; try { if (simli.on) $('#aSimli').muted = L.quiet; else directVoice(L.conv, !L.quiet); } catch {} paintCall(); toast(L.quiet ? 'Son coupé' : 'Son activé'); });
 $('#ccBtn').addEventListener('click', () => { S.set.subs = (S.set.subs + 1) % 3; save(); paintCall(); if (!S.set.subs) $('#subs').querySelectorAll('.line').forEach(e => e.remove());
   toast(['Sous-titres désactivés', 'Sous-titres activés', 'Sous-titres avec traduction'][S.set.subs]); });
 $('#hangBtn').addEventListener('click', endCall);

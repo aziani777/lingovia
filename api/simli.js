@@ -14,7 +14,8 @@ export default async function handler(req, res) {
     // Trinity-2 faces can stream a portrait frame that fills the phone screen; if that size is refused, take the default one
     let r = await ask({ ...base, streaming_width: 576, streaming_height: 1024 });
     if (r.status === 422 || r.status === 400) r = await ask(base);
-    if (!r.ok) return res.status(502).json({ error: (await r.text()).slice(0, 300) });
+    if (!r.ok) { const why = (await r.text()).slice(0, 300); console.warn('simli token refused', r.status, why); return res.status(502).json({ error: why }); }
+    console.log('simli token ok', faceId);
     const j = await r.json();
     res.setHeader('Cache-Control', 'no-store');
     return res.status(200).json({ token: j.session_token });
