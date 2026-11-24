@@ -82,6 +82,8 @@ h1,h2,h3{margin:0;line-height:1.15;letter-spacing:-.01em}
 .stage.hastalk #vLive{opacity:0;transition:opacity .16s}
 .stage.hastalk.voiced #vLive{opacity:1}
 .stage.hastalk #face{display:none}
+.stage #vSimli{opacity:0;pointer-events:none;transition:opacity .45s}
+.stage.simli #vSimli{opacity:1}
 .stage #vReact{opacity:0;transition:opacity .22s;pointer-events:none}
 .stage.reacting #vReact{opacity:1}
 .stage.vid>img,.stage.vid #vIdle,.stage.vid #vLive,.stage.vid #face,.stage.vid #vReact{object-fit:cover;object-position:50% 16%}
@@ -316,6 +318,7 @@ input[type=range]{width:120px;accent-color:var(--accent)}
       <video id="vLive" muted loop playsinline preload="auto"></video>
       <canvas id="face" width="540" height="960"></canvas>
       <video id="vReact" muted playsinline preload="auto"></video>
+      <video id="vSimli" playsinline autoplay></video><audio id="aSimli" autoplay></audio>
       <div id="av3d"></div>
       <div class="hud">
         <button class="pill" id="backBtn" aria-label="Retour">‹ Parcours</button>
@@ -873,7 +876,7 @@ function openLesson(d, trial) {
     <div class="rowsw"><div><b>Mode audio seul</b><span>Sans avatar, pour pratiquer en marchant.</span></div><button class="sw ${S.set.audioOnly ? 'on' : ''}" id="audioSw" aria-label="Mode audio seul"></button></div>`, 'card');
   paintMic();
 }
-function closeLesson() { if (L && L.conv) { const c = L.conv; L.conv = null; c.endSession().catch(() => {}); } clearInterval(tick); releaseWake(); camOff(); stopSpeaking(); stopListening(); $('#vIdle').pause(); face.stop(); av3d.hide(); L = null; show('home'); }
+function closeLesson() { simli.stop(); if (L && L.conv) { const c = L.conv; L.conv = null; c.endSession().catch(() => {}); } clearInterval(tick); releaseWake(); camOff(); stopSpeaking(); stopListening(); $('#vIdle').pause(); face.stop(); av3d.hide(); L = null; show('home'); }
 $('#backBtn').addEventListener('click', closeLesson);
 $('#endBtn').addEventListener('click', () => finish());
 
@@ -907,6 +910,43 @@ function loadSDK() {
     document.head.appendChild(el);
   }));
 }
+/* Live lip sync (Simli): the tutor's voice is streamed to Simli, which sends back a video of their face saying
+   exactly those words, together with the audio in sync. It starts in the background once the call is up and takes
+   over between two sentences. If anything fails, the call simply continues with the tutor's own talking videos. */
+const simli = {
+  cl: null, on: false, lib: null,
+  load() { return this.lib || (this.lib = new Promise(res => { const el = document.createElement('script'); el.src = '/vendor/simli-client.js';
+    el.onload = () => res(!!window.Simli); el.onerror = () => { this.lib = null; res(false); }; document.head.appendChild(el); })); },
+  async start(conv, mine) {
+    const id = new URLSearchParams(location.search).get('simli') || AV().simli;
+    if (!id || S.set.audioOnly || this.cl) return;
+    try {
+      const an = conv.output && conv.output.getAnalyser && conv.output.getAnalyser(); if (!an) return;
+      const [ok, r] = await Promise.all([this.load(), fetch('/api/simli', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ faceId: id }) })]);
+      if (!ok || !r.ok) { console.warn('simli unavailable', r.status, await r.text().catch(() => '')); return; }
+      const { token } = await r.json();
+      if (L !== mine || L.conv !== conv) return;
+      const cl = this.cl = new Simli.SimliClient(token, $('#vSimli'), $('#aSimli'), null, Simli.LogLevel.ERROR);
+      const quit = () => { if (this.cl === cl) this.stop(conv); };
+      cl.on('stop', quit); cl.on('error', quit);
+      await Promise.race([cl.start(), new Promise((_, no) => setTimeout(() => no('timeout'), 15000))]);
+      // wait for a gap between two sentences, so the voice does not jump mid-word when it moves over
+      for (let n = 0; n < 150 && L === mine && L.conv === conv && L.state === 'speaking'; n++) await new Promise(r => setTimeout(r, 120));
+      if (L !== mine || L.conv !== conv || this.cl !== cl) { if (this.cl === cl) this.stop(); return; }
+      this.dest = an.context.createMediaStreamDestination(); this.an = an; an.connect(this.dest);
+      cl.listenToMediastreamTrack(this.dest.stream.getAudioTracks()[0]);
+      conv.setVolume({ volume: 0 }); $('#aSimli').muted = !!L.quiet;
+      this.on = true; $('#stage').classList.add('simli');
+    } catch (e) { console.warn('simli', e); this.stop(conv); }
+  },
+  stop(conv) {
+    const cl = this.cl; this.cl = null;
+    if (this.on && conv && L && L.conv === conv) { try { conv.setVolume({ volume: L.quiet ? 0 : 1 }); } catch {} }
+    this.on = false; $('#stage').classList.remove('simli');
+    try { if (this.an && this.dest) this.an.disconnect(this.dest); } catch {} this.an = this.dest = null;
+    if (cl) { try { Promise.resolve(cl.stop()).catch(() => {}); } catch {} }
+  },
+};
 const releaseWake = () => { if (wake) { wake.release().catch(() => {}); wake = null; } };
 const balance = d => d <= 15 ? 'Speak mostly French, like a friend who happens to be a teacher. Every turn contains one or two short Dutch phrases for the learner to hear and say. Go slowly.'
   : d <= 30 ? 'About half French, half Dutch. Small talk and questions in simple Dutch, explanations and help in French.'
@@ -1015,7 +1055,7 @@ async function startCall(resume) {
     },
     onDisconnect: d => {
       if (L !== mine || !L.conv) return;         // we hung up ourselves
-      L.conv = null; clearInterval(tick);
+      L.conv = null; clearInterval(tick); simli.stop();
       if (d && d.reason === 'error' || !navigator.onLine) { setState('lost'); $('#lost').hidden = false; }
       else afterCall();
     },
@@ -1029,6 +1069,7 @@ async function startCall(resume) {
   L.conv = conv; L.mode = 'call'; L.muted = false; L.quiet = false;
   if (!resume) L.t0 = Date.now();
   try { face.attach(conv.output && conv.output.getAnalyser && conv.output.getAnalyser()); } catch {}
+  simli.start(conv, mine);
   const audio = S.set.audioOnly;
   $('#lesson').classList.add('call'); $('#lesson').classList.toggle('audio', audio);
   $('#cctl').hidden = false; $('#helpBtn').hidden = false; $('#lost').hidden = true; setState('online'); paintCall();
@@ -1075,13 +1116,13 @@ function camOff() { if (cam) { cam.getTracks().forEach(t => t.stop()); cam = nul
 })();
 async function endCall() {
   if (!L || !L.conv) return;
-  const c = L.conv; L.conv = null;
+  const c = L.conv; L.conv = null; simli.stop();
   try { await c.endSession(); } catch {}
   afterCall();
 }
 async function afterCall() {
   if (!L || L.reported) return;
-  L.reported = true; const mine = L, i = L.info;
+  L.reported = true; const mine = L, i = L.info; simli.stop();
   clearInterval(tick); releaseWake();
   $('#cctl').hidden = true; $('#helpBtn').hidden = true; $('#lost').hidden = true; $('#composer').hidden = true; $('#lesson').classList.remove('call', 'audio');
   camOff(); $('#subs').innerHTML = ''; setState('ended'); $('#timer').textContent = '';
@@ -1122,7 +1163,7 @@ async function translate(el) {
 }
 $('#muteBtn').addEventListener('click', () => { if (!L || !L.conv) return; L.muted = !L.muted; try { L.conv.setMicMuted(L.muted); } catch {} paintCall(); toast(L.muted ? 'Micro coupé' : 'Micro activé'); });
 $('#camBtn').addEventListener('click', async () => { if (cam) { camOff(); paintCall(); } else await camOn(); });
-$('#spkBtn').addEventListener('click', () => { if (!L || !L.conv) return; L.quiet = !L.quiet; try { L.conv.setVolume({ volume: L.quiet ? 0 : 1 }); } catch {} paintCall(); toast(L.quiet ? 'Son coupé' : 'Son activé'); });
+$('#spkBtn').addEventListener('click', () => { if (!L || !L.conv) return; L.quiet = !L.quiet; try { if (simli.on) $('#aSimli').muted = L.quiet; else L.conv.setVolume({ volume: L.quiet ? 0 : 1 }); } catch {} paintCall(); toast(L.quiet ? 'Son coupé' : 'Son activé'); });
 $('#ccBtn').addEventListener('click', () => { S.set.subs = (S.set.subs + 1) % 3; save(); paintCall(); if (!S.set.subs) $('#subs').querySelectorAll('.line').forEach(e => e.remove());
   toast(['Sous-titres désactivés', 'Sous-titres activés', 'Sous-titres avec traduction'][S.set.subs]); });
 $('#hangBtn').addEventListener('click', endCall);
