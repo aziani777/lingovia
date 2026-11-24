@@ -1,9 +1,10 @@
 """Build the animated-face assets of a video tutor from two generated clips.
 
-    python3 tools/build-face.py <talk.mp4> <idle.mp4> <out_dir> [output_width]
+    python3 tools/build-face.py <talk.mp4> <idle.mp4> <out_dir> [output_width] [live.mp4]
 
 From the talking clip it picks mouth shapes (3 lip widths x 6 openings), aligns them on the first
 frame and writes them as a sprite sheet. From the idle clip it takes a half and a full blink.
+The optional live clip (body language with the mouth closed, shown while the tutor talks) gets its own face track.
 Outputs base.jpg, mouth.webp, blink.jpg, face.json and preview.jpg in <out_dir>.
 
 Needs: pip install mediapipe opencv-python-headless numpy, and face_landmarker.task next to this
@@ -124,7 +125,22 @@ meta = dict(w=OUT_W, h=round(H * S), fps=round(float(fps), 3),
             track=[[round(float(a), 5), round(float(b), 5), round(float(tx) * S, 2), round(float(ty) * S, 2)] for a, b, tx, ty in tr], mouth=dict(x=round(x0 * S), y=round(y0 * S), w=MW, h=MH, n=6, rows=3),
             blink=dict(x=round(bx0 * S), y=round(by0 * S), w=BW, h=BH),
             face=dict(x=round(float(rp[:, 0].min()) * S), y=round(float(rp[10][1] - 0.35 * face_h) * S), w=round(float(rp[:, 0].max() - rp[:, 0].min()) * S), h=round(face_h * 1.5 * S)))
-json.dump(meta, open(f'{out}/face.json', 'w')); print({k: v for k, v in meta.items() if k != 'track'}, 'track', len(track))
+def face_track(path):
+    res, last = [], [1.0, 0.0, 0.0, 0.0]
+    for f in frames(path):
+        r = analyse(f)
+        if r is not None:
+            Mi, _ = cv2.estimateAffinePartial2D(rp[STABLE], r[0][STABLE], method=cv2.LMEDS)
+            last = [float(Mi[0, 0]), float(Mi[1, 0]), float(Mi[0, 2]), float(Mi[1, 2])]
+        res.append(last)
+    t = np.array(res); t = np.stack([np.convolve(np.pad(t[:, j], 2, mode='wrap'), k, mode='valid') for j in range(4)], 1)
+    return dict(fps=round(float(cv2.VideoCapture(path).get(cv2.CAP_PROP_FPS) or 24), 3),
+                track=[[round(float(a), 5), round(float(b), 5), round(float(tx) * S, 2), round(float(ty) * S, 2)] for a, b, tx, ty in t])
+if len(sys.argv) > 5 and os.path.exists(sys.argv[5]):
+    meta['live'] = face_track(sys.argv[5])
+    rot = [abs(np.degrees(np.arctan2(q[1], q[0]))) for q in meta['live']['track']]
+    print('live clip:', len(rot), 'frames, head tilt up to', round(max(rot), 1), 'deg')
+json.dump(meta, open(f'{out}/face.json', 'w')); print({k: v for k, v in meta.items() if k not in ('track', 'live')}, 'track', len(track))
 
 # preview of every mouth shape and the closed eyes, composited on the base frame
 cx0, cx1 = int(max(0, rp[:, 0].min() - 0.3 * face_h)), int(min(W, rp[:, 0].max() + 0.3 * face_h))

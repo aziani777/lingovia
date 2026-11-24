@@ -77,10 +77,12 @@ h1,h2,h3{margin:0;line-height:1.15;letter-spacing:-.01em}
 .stage video,.stage img,.stage canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 22%}
 .stage #face{opacity:0;transition:opacity .18s}
 .stage.talking #face{opacity:1}
+.stage #vLive{opacity:0;transition:opacity .28s}
+.stage.talking.haslive #vLive{opacity:1}
 .stage #vReact{opacity:0;transition:opacity .22s;pointer-events:none}
 .stage.reacting #vReact{opacity:1}
-.stage.vid>img,.stage.vid #vIdle,.stage.vid #face,.stage.vid #vReact{object-fit:cover;object-position:50% 16%}
-#lesson.call .stage.vid>img,#lesson.call .stage.vid #vIdle,#lesson.call .stage.vid #face,#lesson.call .stage.vid #vReact{object-position:50% 30%}
+.stage.vid>img,.stage.vid #vIdle,.stage.vid #vLive,.stage.vid #face,.stage.vid #vReact{object-fit:cover;object-position:50% 16%}
+#lesson.call .stage.vid>img,#lesson.call .stage.vid #vIdle,#lesson.call .stage.vid #vLive,#lesson.call .stage.vid #face,#lesson.call .stage.vid #vReact{object-position:50% 30%}
 .stage video,.stage>img,.stage #face{transform:scale(1.035)}
 .stage #av3d{position:absolute;inset:0;opacity:0;pointer-events:none;transition:opacity .35s;overflow:hidden;background:radial-gradient(120% 90% at 50% 35%,#f7efe2 0%,#e7ddcb 45%,#b9cfc9 100%)}
 .stage #av3d canvas{position:absolute;inset:0}
@@ -308,6 +310,7 @@ input[type=range]{width:120px;accent-color:var(--accent)}
     <div class="stage" id="stage">
       <img src="" alt="">
       <video id="vIdle" muted loop playsinline preload="auto"></video>
+      <video id="vLive" muted loop playsinline preload="auto"></video>
       <canvas id="face" width="540" height="960"></canvas>
       <video id="vReact" muted playsinline preload="auto"></video>
       <div id="av3d"></div>
@@ -611,7 +614,7 @@ const av3d = (() => {
 /* ---------- face: mouth shapes driven by the voice ---------- */
 const face = (() => {
   // sprite sheet: 3 rows (rounded, neutral, wide lips) x 6 columns (closed to open)
-  let track = null, fps = 24, vfTime = -1;
+  let track = null, fps = 24, vfTime = -1, live = null, liveTime = -1, wasTalking = false;
   let M = null, B = null, CW = 540, CH = 960, base = null, mouth = null, blink = null, loaded = '', clips = {}, pending = null, reactEnd = 0;
   const cv = $('#face'), g = cv.getContext('2d');
   const tmp = document.createElement('canvas'), tg = tmp.getContext('2d');
@@ -620,7 +623,7 @@ const face = (() => {
   async function use(a) {
     const stage = $('#stage'), v = a && a.video;
     stage.classList.toggle('vid', !!v); stage.classList.remove('reacting'); pending = null;
-    if (!v) { loaded = ''; M = null; return; }
+    if (!v) { loaded = ''; M = null; live = null; stage.classList.remove('haslive'); return; }
     stage.classList.remove('nophoto', 'three');
     stage.querySelector(':scope > img').src = v.dir + 'base.jpg';
     const idle = $('#vIdle'); if (!idle.src.endsWith(v.dir + 'idle.mp4')) { idle.poster = v.dir + 'base.jpg'; idle.src = v.dir + 'idle.mp4'; }
@@ -634,6 +637,9 @@ const face = (() => {
       CW = meta.w; CH = meta.h; cv.width = CW; cv.height = CH; tmp.width = meta.mouth.w; tmp.height = meta.mouth.h;
       base = img(v.dir + 'base.jpg'); mouth = img(v.dir + 'mouth.webp'); blink = img(v.dir + 'blink.jpg');
       M = meta.mouth; B = meta.blink; track = meta.track || null; fps = meta.fps || 24; loaded = a.id;
+      live = v.live && meta.live ? meta.live : null;
+      const lv = $('#vLive'); stage.classList.toggle('haslive', !!live);
+      if (live) { lv.src = v.dir + v.live; lv.load(); if (lv.requestVideoFrameCallback && !lv._vf) { lv._vf = true; const cb = (n, md) => { liveTime = md.mediaTime; lv.requestVideoFrameCallback(cb); }; lv.requestVideoFrameCallback(cb); } } else lv.removeAttribute('src');
       for (const c of Object.values(clips)) fetch(v.dir + c).catch(() => {});   // warm the cache
     } catch { M = null; }
   }
@@ -648,7 +654,7 @@ const face = (() => {
     return true;
   }
   let raf = 0, open = 0, prev = 0, peak = 0.05, shape = 1, shapeTo = 1, cLo = 1e9, cHi = 0, wasOpen = false;
-  let nextBlink = 0, blinkAt = -1, live = 0, fbuf = null, lastT = 0;
+  let nextBlink = 0, blinkAt = -1, fbuf = null, lastT = 0;
   const api = { fake: false, start, stop, attach, use, react, state: () => ({ on: !!head, mouth: +open.toFixed(2), level: +rms().toFixed(3), open: +vOpen.toFixed(2), shape: +vShape.toFixed(2), top: head ? Object.entries(head.w).sort((a, b) => b[1] - a[1])[0] : null }) };
 
   // Sound-by-sound mouth shapes (HeadAudio, MIT). Each detected sound maps to [lip shape row, openness].
@@ -760,10 +766,13 @@ const face = (() => {
     /* The idle loop keeps playing underneath: it gives the breathing, the blinks and the head movement. Only the
        lower face (cheeks, nose, mouth, jaw) is drawn here, and it rides on the head using the loop's face track. */
     g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.clearRect(0, 0, CW, CH);
-    if (track) {
-      const idle = $('#vIdle'), i = Math.max(0, Math.min(track.length - 1, Math.round((vfTime >= 0 ? vfTime : idle.currentTime) * fps)));
-      const q = track[i]; g.setTransform(q[0], q[1], -q[1], q[0], q[2], q[3]);
-    }
+    // while she talks, the body-language loop plays (nods, eyebrows, hands); otherwise the quiet idle loop
+    const lv = $('#vLive');
+    if (live && talking !== wasTalking) { if (talking) lv.play().catch(() => {}); else setTimeout(() => { if (!$('#stage').classList.contains('talking')) lv.pause(); }, 400); }
+    wasTalking = talking;
+    const useLive = live && talking && !lv.paused && lv.readyState >= 2;
+    const tr = useLive ? live.track : track, when = useLive ? (liveTime >= 0 ? liveTime : lv.currentTime) : (vfTime >= 0 ? vfTime : $('#vIdle').currentTime);
+    if (tr) { const q = tr[Math.max(0, Math.min(tr.length - 1, Math.round(when * (useLive ? live.fps : fps))))]; g.setTransform(q[0], q[1], -q[1], q[0], q[2], q[3]); }
     const f = open * (M.n - 1) * 0.7, k0 = Math.floor(f), k1 = Math.min(M.n - 1, k0 + 1), a = f - k0;
     const r0 = Math.min(M.rows - 1, Math.floor(shape)), r1 = Math.min(M.rows - 1, r0 + 1), rb = shape - r0;
     row(r0, k0, k1, a, g, M.x, M.y);
@@ -771,7 +780,7 @@ const face = (() => {
     g.setTransform(1, 0, 0, 1, 0, 0);
   }
   function start() { if (!raf) { nextBlink = performance.now() + 1500; raf = requestAnimationFrame(frame); } }
-  function stop() { cancelAnimationFrame(raf); raf = 0; open = 0; live = 0; }
+  function stop() { cancelAnimationFrame(raf); raf = 0; open = 0; try { $('#vLive').pause(); } catch {} }
   return api;
 })();
 
