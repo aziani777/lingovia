@@ -922,32 +922,40 @@ const simli = {
   cl: null, on: false, lib: null,
   load() { return this.lib || (this.lib = new Promise(res => { const el = document.createElement('script'); el.src = '/vendor/simli-client.js';
     el.onload = () => res(!!window.Simli); el.onerror = () => { this.lib = null; res(false); }; document.head.appendChild(el); })); },
-  async start(conv, mine) {
+  // Opens the Simli session. Called while the call is still connecting, so the live face is ready for the first sentence.
+  async prepare(mine) {
     const id = new URLSearchParams(location.search).get('simli') || AV().simli;
-    if (!id || S.set.audioOnly || this.cl) return;
+    if (!id || S.set.audioOnly || this.cl) return false;
     try {
-      const an = conv.output && conv.output.getAnalyser && conv.output.getAnalyser(); if (!an) return;
       const [ok, r] = await Promise.all([this.load(), fetch('/api/simli', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ faceId: id }) })]);
-      if (!ok || !r.ok) { const why = ok ? ((await r.json().catch(() => ({}))).error || r.status) : 'script'; console.warn('simli unavailable', why); toast('Visage en direct indisponible : ' + String(why).slice(0, 80)); return; }
+      if (!ok || !r.ok) { const why = ok ? ((await r.json().catch(() => ({}))).error || r.status) : 'script'; console.warn('simli unavailable', why); toast('Visage en direct indisponible : ' + String(why).slice(0, 80)); return false; }
       const { token } = await r.json();
-      if (L !== mine || L.conv !== conv) return;
+      if (L !== mine) return false;
       const cl = this.cl = new Simli.SimliClient(token, $('#vSimli'), $('#aSimli'), null, Simli.LogLevel.ERROR);
-      const quit = () => { if (this.cl === cl) this.stop(conv); };
+      const quit = () => { if (this.cl === cl) this.stop(L && L.conv); };
       cl.on('stop', quit); cl.on('error', quit);
       await Promise.race([cl.start(), new Promise((_, no) => setTimeout(() => no('timeout'), 15000))]);
-      // wait for a gap between two sentences, so the voice does not jump mid-word when it moves over
-      for (let n = 0; n < 150 && L === mine && L.conv === conv && L.state === 'speaking'; n++) await new Promise(r => setTimeout(r, 120));
-      if (L !== mine || L.conv !== conv || this.cl !== cl) { if (this.cl === cl) this.stop(); return; }
+      if (L !== mine || this.cl !== cl) { if (this.cl === cl) this.stop(); return false; }
+      return this.ready = true;
+    } catch (e) { console.warn('simli', e); toast('Visage en direct indisponible : ' + String(e && e.message || e).slice(0, 80)); this.stop(); return false; }
+  },
+  // Routes the tutor's voice through Simli. wait: hold on for a gap between two sentences, so the voice does not jump mid-word.
+  async attach(conv, mine, wait) {
+    try {
+      const an = conv.output && conv.output.getAnalyser && conv.output.getAnalyser(); if (!an || !this.ready || this.on) return;
+      const cl = this.cl;
+      for (let n = 0; wait && n < 150 && L === mine && L.conv === conv && L.state === 'speaking'; n++) await new Promise(r => setTimeout(r, 120));
+      if (L !== mine || L.conv !== conv || this.cl !== cl || !cl) return;
       this.dest = an.context.createMediaStreamDestination(); this.an = an; an.connect(this.dest);
       cl.listenToMediastreamTrack(this.dest.stream.getAudioTracks()[0]);
       directVoice(conv, false); $('#aSimli').muted = !!L.quiet; $('#aSimli').play().catch(() => {});
       this.on = true; $('#stage').classList.add('simli'); $('#liveTag').hidden = false;
-    } catch (e) { console.warn('simli', e); toast('Visage en direct indisponible : ' + String(e && e.message || e).slice(0, 80)); this.stop(conv); }
+    } catch (e) { console.warn('simli', e); this.stop(conv); }
   },
   stop(conv) {
     const cl = this.cl; this.cl = null;
     if (this.on && conv && L && L.conv === conv) directVoice(conv, !L.quiet);
-    this.on = false; $('#stage').classList.remove('simli'); $('#liveTag').hidden = true;
+    this.on = this.ready = false; $('#stage').classList.remove('simli'); $('#liveTag').hidden = true;
     try { if (this.an && this.dest) this.an.disconnect(this.dest); } catch {} this.an = this.dest = null;
     if (cl) { try { Promise.resolve(cl.stop()).catch(() => {}); } catch {} }
   },
@@ -1018,9 +1026,11 @@ async function subTutor(text) {
   } catch {}
 }
 
-async function startCall(resume) {
+async function startCall(resume) { try { return await startCall0(resume); } catch (e) { simli.stop(); throw e; } }
+async function startCall0(resume) {
   const mine = L, i = L.info, av = AV();
   setState('connecting');
+  const live = simli.prepare(mine);
   const [ok, r] = await Promise.all([loadSDK(), fetch('/api/session', { method: 'POST' })]);
   if (!ok || !r.ok) throw new Error('unavailable');
   const { token, signedUrl } = await r.json();
@@ -1067,6 +1077,9 @@ async function startCall(resume) {
     onError: () => {},
   };
   const C2 = window.ElevenLabsClient.Conversation;
+  // give the live face up to 8 s to be ready, so the tutor is lip-synced from the very first word
+  await Promise.race([live, new Promise(r => setTimeout(r, 8000))]);
+  if (L !== mine) { simli.stop(); return; }
   let conv;
   try { if (!token) throw new Error('no token'); conv = await C2.startSession({ conversationToken: token, connectionType: 'webrtc', ...opts }); }
   catch (e) { if (!signedUrl || (e && e.name === 'NotAllowedError')) throw e; conv = await C2.startSession({ signedUrl, connectionType: 'websocket', ...opts }); }
@@ -1074,7 +1087,7 @@ async function startCall(resume) {
   L.conv = conv; L.mode = 'call'; L.muted = false; L.quiet = false;
   if (!resume) L.t0 = Date.now();
   try { face.attach(conv.output && conv.output.getAnalyser && conv.output.getAnalyser()); } catch {}
-  simli.start(conv, mine);
+  if (simli.ready) simli.attach(conv, mine); else live.then(ok => { if (ok) simli.attach(conv, mine, true); });
   const audio = S.set.audioOnly;
   $('#lesson').classList.add('call'); $('#lesson').classList.toggle('audio', audio);
   $('#cctl').hidden = false; $('#helpBtn').hidden = false; $('#lost').hidden = true; setState('online'); paintCall();
