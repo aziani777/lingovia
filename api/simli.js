@@ -7,12 +7,13 @@ export default async function handler(req, res) {
   const faceId = String((req.body && req.body.faceId) || '');
   if (!/^[0-9a-f-]{36}$/i.test(faceId)) return res.status(400).json({ error: 'bad_face' });
   try {
-    const r = await fetch('https://api.simli.ai/compose/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-simli-api-key': key },
-      // handleSilence false: the app streams the voice track continuously, silences included
-      body: JSON.stringify({ faceId, handleSilence: false, maxSessionLength: 1800, maxIdleTime: 120 }),
-    });
+    // handleSilence false: the app streams the voice track continuously, silences included
+    const base = { faceId, handleSilence: false, maxSessionLength: 1800, maxIdleTime: 120 };
+    const ask = body => fetch('https://api.simli.ai/compose/token', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-simli-api-key': key }, body: JSON.stringify(body) });
+    // Trinity-2 faces can stream a portrait frame that fills the phone screen; if that size is refused, take the default one
+    let r = await ask({ ...base, streaming_width: 576, streaming_height: 1024 });
+    if (r.status === 422 || r.status === 400) r = await ask(base);
     if (!r.ok) return res.status(502).json({ error: (await r.text()).slice(0, 300) });
     const j = await r.json();
     res.setHeader('Cache-Control', 'no-store');
