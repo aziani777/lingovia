@@ -6,6 +6,7 @@
 // model   : optional rigged GLB with ARKit + Oculus viseme blend shapes, for a 3D tutor instead of a video one (with opts, tint)
 // voice   : ElevenLabs voice id for the live call and phrase playback. voiceBE is used for Belgian Dutch.
 // sample  : audio preview played in the tutor picker (assets/avatars/<id>.mp3 says sampleText)
+// simli   : optional Simli face id. When set, calls show a live video lip-synced to the tutor's words (needs SIMLI_API_KEY)
 // style   : which answer to "what kind of tutor would you like" leads to this tutor. tags: shown on the tutor card
 // thumb   : square face picture, used on the home screen and in the tutor picker
 (() => {
@@ -17,6 +18,7 @@
       persona: '32, a Dutch teacher from Utrecht who lives in Amsterdam. Warm, patient and encouraging: you put the learner at ease and celebrate small wins. You love cycling and good coffee',
       voice: 'OlBRrVAItyi00MuGMbna', voiceBE: 'g7B5PNoscIXomLNUmHAb',
       sampleText: 'Hallo, ik ben Sanne! Avec moi, on prend le temps. On avance ensemble, tranquillement.',
+      simli: '3c716a7a-1248-4b1d-bb26-057db5c84648',
       video: { dir: '/assets/avatars/sanne/', talk: ['talk1.mp4', 'talk2.mp4'], live: 'live.mp4', clips: { wave: 'wave.mp4', thumbs_up: 'thumbs.mp4', laugh: 'laugh.mp4' } } }),
     t('emma', { style: 'fun', tags: ['Enjouée', 'Drôle', 'Rapide'], name: 'Emma', gender: 'F', age: 24, trait: 'Dynamique',
       bio: 'Vive et drôle. Elle te fait parler vite et beaucoup.',
