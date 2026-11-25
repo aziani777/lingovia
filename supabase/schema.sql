@@ -22,3 +22,7 @@ create index if not exists calls_user_started on public.calls (user_id, started_
 -- Nobody reads or writes these tables from the browser: only the server does, with the secret key.
 alter table public.profiles enable row level security;
 alter table public.calls enable row level security;
+
+-- New Supabase projects no longer give the server key access to new tables by default: grant it explicitly.
+grant select, insert, update, delete on public.profiles, public.calls to service_role;
+grant usage, select on all sequences in schema public to service_role;
