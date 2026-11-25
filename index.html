@@ -936,9 +936,11 @@ const simli = {
       if (L !== mine) return false;
       const cl = this.cl = new Simli.SimliClient(token, $('#vSimli'), $('#aSimli'), null, Simli.LogLevel.ERROR);
       const quit = () => { if (this.cl === cl) this.stop(L && L.conv); };
-      cl.on('stop', quit); cl.on('error', quit);
+      cl.on('stop', quit); cl.on('error', quit); cl.on('warning', m => console.warn('simli', m));
       await Promise.race([cl.start(), new Promise((_, no) => setTimeout(() => no('timeout'), 15000))]);
       if (L !== mine || this.cl !== cl) { if (this.cl === cl) this.stop(); return false; }
+      // Simli frames the tutor tighter than their own videos: pull the camera back so the switch to live is not a jump cut
+      try { cl.setCamera({ zoom: S.set.liveZoom || 0.7 }); } catch (e) { console.warn('simli camera', e); }
       return this.ready = true;
     } catch (e) { console.warn('simli', e); toast('Visage en direct indisponible : ' + String(e && e.message || e).slice(0, 80)); this.stop(); return false; }
   },
@@ -1374,7 +1376,8 @@ function renderSettings() {
     <div class="set"><div><b>Vitesse de la voix</b><span>Ralentis au début, accélère ensuite.</span></div><input type="range" id="rate" min="0.6" max="1.1" step="0.05" value="${s.rate}"></div>
     <div class="set"><div><b>Afficher les traductions</b><span>Désactive pour deviner avant de toucher la phrase.</span></div><button class="sw ${s.showTr ? 'on' : ''}" data-k="showTr" aria-label="Traductions"></button></div>
     <div class="set"><div><b>Débloquer tous les jours</b><span>Pour choisir librement dans le programme.</span></div><button class="sw ${s.unlockAll ? 'on' : ''}" data-k="unlockAll" aria-label="Débloquer"></button></div>
-    <div class="set"><div><b>Vitesse des lèvres</b><span>Vers la gauche, le prof parle avec des gestes plus lents.</span></div><input type="range" id="lipSpeed" min="0.3" max="1" step="0.05" value="${s.lipSpeed || 0.6}"></div>
+    <div class="set"><div><b>Cadrage en direct</b><span>Vers la gauche, on voit le prof de plus loin. S'applique au prochain appel.</span></div><input type="range" id="liveZoom" min="0.5" max="1.2" step="0.05" value="${s.liveZoom || 0.7}"></div>
+<div class="set"><div><b>Vitesse des lèvres</b><span>Vers la gauche, le prof parle avec des gestes plus lents.</span></div><input type="range" id="lipSpeed" min="0.3" max="1" step="0.05" value="${s.lipSpeed || 0.6}"></div>
     <div class="set"><div><b>Retard des lèvres</b><span>Si la bouche bouge avant le son sur ton téléphone, augmente un peu. Actuel : ${s.lipDelay || 0} ms.</span></div><input type="range" id="lipDelay" min="0" max="300" step="20" value="${s.lipDelay || 0}"></div>
     <div class="set"><div><b>Tester la voix</b><span>La voix de ${esc(c.tutor)}, en ${esc(c.target.name)} puis en ${esc(c.native.name)}.</span></div><button class="btn ghost" id="testVoice">Écouter</button></div>
   </div>
@@ -1389,7 +1392,7 @@ $('#settingsBody').addEventListener('click', e => {
   if (e.target.closest('#editProfile')) return startOnb(true);
   if (e.target.closest('#reset') && confirm('Effacer toute ta progression ?')) { S = structuredClone(DEF); save(); R = null; startOnb(); toast('Progression effacée'); }
 });
-$('#settingsBody').addEventListener('change', e => { if (e.target.id === 'rate') { S.set.rate = +e.target.value; save(); } if (e.target.id === 'lipSpeed') { S.set.lipSpeed = +e.target.value; save(); } if (e.target.id === 'lipDelay') { S.set.lipDelay = +e.target.value; save(); renderSettings(); } });
+$('#settingsBody').addEventListener('change', e => { if (e.target.id === 'rate') { S.set.rate = +e.target.value; save(); } if (e.target.id === 'lipSpeed') { S.set.lipSpeed = +e.target.value; save(); } if (e.target.id === 'liveZoom') { S.set.liveZoom = +e.target.value; save(); } if (e.target.id === 'lipDelay') { S.set.lipDelay = +e.target.value; save(); renderSettings(); } });
 
 /* ---------- onboarding questionnaire ---------- */
 const OB = () => window.ONBOARDING[S.pair] || window.ONBOARDING['nl-fr'];
