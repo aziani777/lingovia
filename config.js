@@ -2,5 +2,5 @@
 // supabaseKey is the project's *publishable* key. While it is empty, accounts, minute limits and payment stay off.
 window.LINGOVIA = {
   supabaseUrl: 'https://theucoiqbndpqaqqqnvy.supabase.co',
-  supabaseKey: '',
+  supabaseKey: 'sb_publishable_plcv2Aw5WJSogXM2XgcRxw_7rW22YKq',
 };
