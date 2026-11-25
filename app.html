@@ -275,6 +275,18 @@ input[type=range]{width:120px;accent-color:var(--accent)}
 .pick button.sel{color:var(--accent)}.pick button.sel img{border-color:var(--accent)}
 .empty{text-align:center;color:var(--muted);padding:40px 20px}
 #toast{position:absolute;left:50%;bottom:90px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:10px 16px;border-radius:99px;font-size:14px;font-weight:600;opacity:0;pointer-events:none;transition:.25s;z-index:20;max-width:88%;text-align:center}
+#gate{position:absolute;inset:0;z-index:60;background:rgba(20,16,10,.5);display:flex;align-items:flex-end}
+.gatebox{position:relative;width:100%;max-height:92%;overflow:auto;background:var(--bg);border-radius:24px 24px 0 0;padding:26px 20px calc(22px + var(--safe-b))}
+#gateX{position:absolute;top:12px;right:14px;width:36px;height:36px;border-radius:50%;background:var(--card);font-size:15px;color:var(--muted)}
+#gateBody h2{font-size:24px;margin-right:36px}
+#gateBody p{color:var(--muted);margin:8px 0 0}
+#gateBody input{display:block;width:100%;margin-top:12px;padding:14px;border-radius:14px;border:1.5px solid var(--line);background:var(--card);font:inherit;color:var(--ink)}
+#gateBody .err{color:#b42318;font-size:14px;min-height:20px;margin-top:8px}
+#gateBody .lnk{display:block;width:100%;text-align:center;margin-top:14px;color:var(--teal);font-weight:700}
+.plan{background:var(--card);border:1.5px solid var(--line);border-radius:18px;padding:16px;margin-top:12px}
+.plan.best{border-color:var(--accent)}
+.plan b{font-size:18px}.plan em{font-style:normal;float:right;font-weight:800;font-size:18px}
+.plan span{display:block;color:var(--muted);font-size:14px;margin:4px 0 12px}
 #toast.on{opacity:1;transform:translateX(-50%)}
 </style>
 </head>
@@ -356,9 +368,11 @@ input[type=range]{width:120px;accent-color:var(--accent)}
     <button data-v="review"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="14" height="14" rx="2"/><path d="M7 2h12a2 2 0 0 1 2 2v12"/></svg>Réviser</button>
     <button data-v="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>Réglages</button>
   </nav>
+  <div id="gate" hidden><div class="gatebox"><button id="gateX" aria-label="Fermer">✕</button><div id="gateBody"></div></div></div>
   <div id="toast"></div>
 </div>
 
+<script src="/config.js"></script>
 <script src="/curriculum.js"></script>
 <script src="/avatars.js"></script>
 <script src="/onboarding.js"></script>
@@ -385,7 +399,7 @@ const DEF = { pair: 'nl-fr', done: {}, streak: 0, last: '', cards: [], set: { ra
 let S;
 try { S = Object.assign({}, DEF, JSON.parse(localStorage.getItem(KEY) || '{}')); S.set = Object.assign({}, DEF.set, S.set); }
 catch { S = structuredClone(DEF); }
-const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} if (typeof acct !== 'undefined') acct.queue(); };
 const C = () => window.COURSES[S.pair] || window.COURSES['nl-fr'];
 const AV = () => window.AVATARS.find(a => a.id === S.set.avatar) || window.AVATARS[0];
 const tutorVoice = () => (S.profile && S.profile.variant === 'be' && AV().voiceBE) || AV().voice;
@@ -396,6 +410,89 @@ const currentDay = () => { for (let d = startDay(); d <= 90; d++) if (!S.done[d]
 const unlocked = d => S.set.unlockAll || d <= startDay() || S.done[d - 1] || S.done[d];
 const phaseOf = d => C().phases.find(p => d >= p.from && d <= p.to);
 const dayInfo = d => { const r = C().days[d - 1]; return { n: d, title: r[0], focus: r[1], scenario: r[2], phrases: r[3].map(p => ({ target: p[0], native: p[1] })), level: phaseOf(d).level }; };
+
+
+/* ---------- account, minutes and subscription ----------
+   Accounts are Supabase users (email and password). The browser only ever holds the learner's own session;
+   minutes and subscriptions are checked on the server (api/account.js, api/session.js).
+   Without a publishable key in config.js all of this stays off and the app works as before. */
+const CFG = window.LINGOVIA || {};
+const AUTHKEY = 'lingovia.auth';
+const acct = {
+  on: !!(CFG.supabaseUrl && CFG.supabaseKey), s: null, info: null, t: null,
+  load() { try { this.s = JSON.parse(localStorage.getItem(AUTHKEY) || 'null'); } catch { this.s = null; } },
+  keep(j) { this.s = { access: j.access_token, refresh: j.refresh_token, exp: Date.now() + ((j.expires_in || 3600) - 90) * 1000, email: j.user && j.user.email }; try { localStorage.setItem(AUTHKEY, JSON.stringify(this.s)); } catch {} },
+  async auth(path, body) {
+    const r = await fetch(`${CFG.supabaseUrl}/auth/v1/${path}`, { method: 'POST', headers: { apikey: CFG.supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error_code || j.msg || j.error_description || j.message || 'auth');
+    return j;
+  },
+  async sign(email, password, isNew) {
+    const j = await this.auth(isNew ? 'signup' : 'token?grant_type=password', { email, password });
+    if (!j.access_token) throw new Error('confirm');          // the project asks to confirm the email first
+    this.keep(j); await this.sync(isNew);
+  },
+  async token() {
+    if (!this.on || !this.s) return null;
+    if (Date.now() > this.s.exp) { try { this.keep(await this.auth('token?grant_type=refresh_token', { refresh_token: this.s.refresh })); } catch { this.out(); return null; } }
+    return this.s.access;
+  },
+  async api(q = '', opt = {}) {
+    const t = await this.token();
+    return fetch('/api/account' + q, { method: opt.method || 'GET', headers: { 'Content-Type': 'application/json', ...(t ? { Authorization: 'Bearer ' + t } : {}) }, body: opt.body ? JSON.stringify(opt.body) : undefined });
+  },
+  async refresh() { if (!this.on || !this.s) return null; try { const r = await this.api(); if (r.ok) this.info = await r.json(); else if (r.status === 401) this.out(); } catch {} return this.info; },
+  // After signing in: take the progress saved on the account if it is further along than this device's, otherwise save this device's.
+  async sync(isNew) {
+    const i = await this.refresh(); if (!i) return;
+    const far = st => st && st.profile && st.profile.done ? Object.keys(st.done || {}).length + 1 : 0;
+    if (!isNew && far(i.state) > far(S)) { S = Object.assign({}, DEF, i.state); S.set = Object.assign({}, DEF.set, S.set); try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} }
+    else this.push();
+  },
+  queue() { if (!this.on || !this.s) return; clearTimeout(this.t); this.t = setTimeout(() => this.push(), 4000); },
+  push() { clearTimeout(this.t); if (this.on && this.s) this.api('', { method: 'PUT', body: { state: S } }).catch(() => {}); },
+  out() { this.s = null; this.info = null; try { localStorage.removeItem(AUTHKEY); } catch {} },
+  left() { return this.info ? Math.floor(this.info.leftSeconds / 60) : null },
+};
+acct.load();
+const PLAN_NAMES = { free: 'Découverte', essentiel: 'Essentiel', intensif: 'Intensif' };
+const AUTH_ERR = { invalid_credentials: 'Email ou mot de passe incorrect.', user_already_exists: 'Un compte existe déjà avec cet email. Connecte-toi.', weak_password: 'Mot de passe trop court : 6 caractères au minimum.',
+  email_address_invalid: 'Cette adresse email ne semble pas valide.', over_email_send_rate_limit: 'Trop de tentatives. Réessaie dans quelques minutes.', confirm: 'Compte créé. Ouvre le mail de confirmation, puis connecte-toi.' };
+
+// The sheet that asks to sign in, or to pick an offer when the minutes are used up.
+function gate(kind, why) {
+  const g = $('#gate'), b = $('#gateBody'); g.hidden = false;
+  if (kind === 'auth' || kind === 'login') {
+    const isNew = kind === 'auth';
+    b.innerHTML = `<h2>${isNew ? 'Crée ton compte gratuit' : 'Content de te revoir'}</h2>
+      <p>${esc(why || (isNew ? 'Pour garder ta progression et continuer avec 10 minutes d\'appel offertes.' : 'Connecte-toi pour retrouver ta progression.'))}</p>
+      <form id="authForm" data-new="${isNew ? 1 : ''}"><input type="email" name="email" placeholder="Ton email" autocomplete="email" required>
+      <input type="password" name="password" placeholder="Mot de passe (6 caractères min.)" autocomplete="${isNew ? 'new-password' : 'current-password'}" minlength="6" required>
+      <div class="err" id="authErr"></div><button class="btn block">${isNew ? 'Créer mon compte' : 'Me connecter'}</button></form>
+      <button class="lnk" data-gate="${isNew ? 'login' : 'auth'}">${isNew ? 'J\'ai déjà un compte' : 'Créer un compte'}</button>`;
+  } else {
+    const pay = acct.info && acct.info.payment;
+    b.innerHTML = `<h2>${why ? esc(why) : 'Choisis ton offre'}</h2><p>Sans engagement. Tu peux arrêter quand tu veux, en un clic.</p>
+      <div class="plan best"><em>12,99 € / mois</em><b>Essentiel</b><span>90 minutes d'appel par mois, soit environ 3 minutes par jour.</span><button class="btn block" data-plan="essentiel" ${pay ? '' : 'disabled'}>${pay ? 'Choisir Essentiel' : 'Bientôt disponible'}</button></div>
+      <div class="plan"><em>24,99 € / mois</em><b>Intensif</b><span>200 minutes d'appel par mois, soit environ 7 minutes par jour.</span><button class="btn block ghost" data-plan="intensif" ${pay ? '' : 'disabled'}>${pay ? 'Choisir Intensif' : 'Bientôt disponible'}</button></div>
+      <div class="err" id="authErr"></div>`;
+  }
+}
+$('#gateX').addEventListener('click', () => { $('#gate').hidden = true; });
+$('#gate').addEventListener('click', async e => {
+  const sw = e.target.closest('[data-gate]'); if (sw) return gate(sw.dataset.gate);
+  const pl = e.target.closest('[data-plan]');
+  if (pl && !pl.disabled) { pl.disabled = true;
+    try { const r = await acct.api('?do=checkout', { method: 'POST', body: { plan: pl.dataset.plan } }); const j = await r.json(); if (j.url) return location.assign(j.url); throw new Error(j.error); }
+    catch { $('#authErr').textContent = 'Le paiement est indisponible pour le moment. Réessaie plus tard.'; pl.disabled = false; } }
+});
+$('#gate').addEventListener('submit', async e => {
+  e.preventDefault(); const f = e.target, btn = f.querySelector('button'), d = new FormData(f); btn.disabled = true; $('#authErr').textContent = '';
+  try { await acct.sign(String(d.get('email')).trim(), String(d.get('password')), !!f.dataset.new); $('#gate').hidden = true; toast('Te voilà connecté'); show($('.view.on').id); }
+  catch (er) { $('#authErr').textContent = AUTH_ERR[er.message] || 'Connexion impossible. Vérifie tes informations et réessaie.'; if (er.message === 'confirm') gate('login', AUTH_ERR.confirm); }
+  btn.disabled = false;
+});
 
 let toastT;
 function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2400); }
@@ -1036,9 +1133,13 @@ async function startCall0(resume) {
   const mine = L, i = L.info, av = AV();
   setState('connecting');
   const live = simli.warm();
-  const [ok, r] = await Promise.all([loadSDK(), fetch('/api/session', { method: 'POST' })]);
+  const tk = await acct.token();
+  if (acct.on && !tk && S.trialDone) { gate('auth', 'Ton appel découverte est terminé. Crée ton compte pour continuer : 10 minutes d\'appel sont offertes.'); throw Object.assign(new Error('gate'), { gate: true }); }
+  const [ok, r] = await Promise.all([loadSDK(), fetch('/api/session', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(tk ? { Authorization: 'Bearer ' + tk } : {}) }, body: JSON.stringify({ trial: !tk }) })]);
+  if (r.status === 401) { gate('auth'); throw Object.assign(new Error('gate'), { gate: true }); }
+  if (r.status === 402) { await acct.refresh(); gate('plans', 'Tu as utilisé toutes tes minutes'); throw Object.assign(new Error('gate'), { gate: true }); }
   if (!ok || !r.ok) throw new Error('unavailable');
-  const { token, signedUrl } = await r.json();
+  const { token, signedUrl, maxSeconds } = await r.json();
   const opts = {
     dynamicVariables: { day: String(i.n), level: i.level, lesson_title: i.title, focus: i.focus, scenario: i.scenario,
       phrases: i.phrases.map(p => `- ${p.target} = ${p.native}`).join('\n'), balance: balance(i.n),
@@ -1091,6 +1192,11 @@ async function startCall0(resume) {
   if (L !== mine) { conv.endSession().catch(() => {}); return; }
   L.conv = conv; L.mode = 'call'; L.muted = false; L.quiet = false;
   if (!resume) L.t0 = Date.now();
+  // minutes: tell the server which call this is, and hang up politely when the time included in the offer runs out
+  try { L.cid = conv.getId && conv.getId(); } catch {}
+  if (acct.on && tk && L.cid) acct.api('?do=call', { method: 'POST', body: { conversationId: L.cid } }).catch(() => {});
+  if (acct.on && !tk) { S.trialDone = true; save(); }
+  if (maxSeconds) { clearTimeout(L.cap); L.cap = setTimeout(() => { if (L === mine && L.conv === conv) { L.capped = true; toast('Ton temps d\'appel est écoulé'); endCall(); } }, maxSeconds * 1000); }
   try { face.attach(conv.output && conv.output.getAnalyser && conv.output.getAnalyser()); } catch {}
   if (simli.ready) simli.attach(conv, mine); else live.then(ok => { if (ok) simli.attach(conv, mine, true); });
   const audio = S.set.audioOnly;
@@ -1146,7 +1252,8 @@ async function endCall() {
 async function afterCall() {
   if (!L || L.reported) return;
   L.reported = true; const mine = L, i = L.info; simli.stop();
-  clearInterval(tick); releaseWake();
+  clearInterval(tick); releaseWake(); clearTimeout(L.cap);
+  if (acct.on && acct.s && L.cid) acct.api('?do=call', { method: 'POST', body: { conversationId: L.cid, seconds: Math.round((Date.now() - L.t0) / 1000) } }).then(() => acct.refresh()).catch(() => {});
   $('#cctl').hidden = true; $('#helpBtn').hidden = true; $('#lost').hidden = true; $('#composer').hidden = true; $('#lesson').classList.remove('call', 'audio');
   camOff(); $('#subs').innerHTML = ''; setState('ended'); $('#timer').textContent = '';
   if (S.set.audioOnly) av3d.show(); else av3d.view(false);
@@ -1170,6 +1277,8 @@ async function afterCall() {
     <h4>3 corrections principales</h4>${fixes.length ? fixes.map(f => `<div class="fx"><s>${esc(f.said)}</s><b>${esc(f.correct)}</b><span>${esc(f.why)}</span></div>`).join('') : '<p style="margin:0;color:var(--muted)">Aucune faute importante. Bravo.</p>'}
     <button class="btn block teal" id="doneBtn" style="margin-top:16px">Valider le jour ${i.n}</button>
     <button class="btn block ghost" id="againBtn" style="margin-top:8px">Refaire l'appel</button>`;
+  if (acct.on && !acct.s) setTimeout(() => gate('auth', 'Bravo pour ce premier appel ! Crée ton compte pour garder ta progression. 10 minutes d\'appel sont offertes.'), 1800);
+  else if (L.capped && acct.info && acct.info.plan === 'free') setTimeout(() => gate('plans', 'Tes minutes offertes sont utilisées'), 1800);
   card.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 async function translate(el) {
@@ -1207,6 +1316,7 @@ async function begin() {
   catch (e) {
     if (L !== mine) return;
     document.getElementById('ringing')?.remove(); setState('ended');
+    if (e && e.gate) return add(`<button class="btn block" id="againBtn">Appeler ${esc(AV().name)}</button>`, 'card');
     const denied = e && (e.name === 'NotAllowedError' || /permission|denied/i.test(e.message || ''));
     if (denied) return add(`<h3>Micro refusé</h3><p class="sub">${esc(AV().name)} a besoin de ton micro pour t'entendre. Autorise-le dans les réglages du navigateur pour ce site, puis réessaie.</p>
       <button class="btn block" id="againBtn">Réessayer</button><button class="btn block ghost" id="textBtn" style="margin-top:8px">Continuer par écrit</button>`, 'card');
@@ -1368,7 +1478,11 @@ $('#reviewBody').addEventListener('click', e => {
 /* ---------- settings ---------- */
 function renderSettings() {
   const s = S.set, c = C();
-  $('#settingsBody').innerHTML = `<div class="card">
+  const a = acct.info, acc = !acct.on ? '' : !acct.s ? `<div class="card" style="margin-bottom:16px"><div class="set"><div><b>Mon compte</b><span>Connecte-toi pour garder ta progression sur tous tes appareils.</span></div><button class="btn" id="accLogin">Me connecter</button></div></div>`
+    : `<div class="card" style="margin-bottom:16px"><div class="set"><div><b>Mon compte</b><span>${esc(acct.s.email || '')}</span></div><button class="btn ghost" id="accOut">Déconnexion</button></div>
+    <div class="set"><div><b>Offre ${a ? PLAN_NAMES[a.plan] : '…'}</b><span>${a ? `${Math.floor(a.leftSeconds / 60)} min restantes sur ${Math.round(a.totalSeconds / 60)}${a.renews ? (a.ending ? ' · se termine le ' : ' · renouvelée le ') + new Date(a.renews).toLocaleDateString('fr-FR') : ''}` : 'Chargement…'}</span></div>${a && a.plan !== 'free' ? '<button class="btn ghost" id="accPortal">Gérer</button>' : '<button class="btn" id="accPlans">Voir les offres</button>'}</div></div>`;
+  if (acct.on && acct.s && !a) acct.refresh().then(i => { if (i && $('#settings').classList.contains('on')) renderSettings(); });
+  $('#settingsBody').innerHTML = `${acc}<div class="card">
     <div class="set"><div><b>Mon prof</b><span>${esc(AV().name)}, ${esc(AV().trait.toLowerCase())}. Touche un visage pour changer.</span>
       <div class="pick" id="pickTutor">${window.AVATARS.map(a => `<button data-av="${a.id}" class="${a.id === AV().id ? 'sel' : ''}"><img src="${a.thumb}" alt="">${esc(a.name)}</button>`).join('')}</div></div></div>
     <div class="set"><div><b>Mon profil</b><span>${S.profile && S.profile.done === true ? `${esc(S.profile.name)} · ${esc(OB().levels[S.profile.level || 0])} · ${S.profile.variant === 'be' ? 'Belgique' : 'Pays-Bas'} · ${S.profile.minutes || 10} min par jour` : 'Questionnaire pas encore rempli.'}</span></div><button class="btn ghost" id="editProfile">Modifier</button></div>
@@ -1389,6 +1503,10 @@ $('#settingsBody').addEventListener('click', e => {
   if (e.target.closest('#testVoice')) unlockAudio();
   if (e.target.closest('#testVoice')) return speak([{ lang: 'target', text: C().days[0][3][2][0] }, { lang: 'native', text: C().days[0][3][2][1] }]);
   const pk = e.target.closest('[data-av]'); if (pk) { S.set.avatar = pk.dataset.av; save(); unlockAudio(); player.src = AV().sample; player.play().catch(() => {}); return renderSettings(); }
+  if (e.target.closest('#accLogin')) return gate('login');
+  if (e.target.closest('#accPlans')) return gate('plans');
+  if (e.target.closest('#accOut')) { acct.push(); acct.out(); toast('Déconnecté'); return renderSettings(); }
+  if (e.target.closest('#accPortal')) return acct.api('?do=portal', { method: 'POST' }).then(r => r.json()).then(j => j.url ? location.assign(j.url) : toast('Indisponible pour le moment')).catch(() => toast('Indisponible pour le moment'));
   if (e.target.closest('#editProfile')) return startOnb(true);
   if (e.target.closest('#reset') && confirm('Effacer toute ta progression ?')) { S = structuredClone(DEF); save(); R = null; startOnb(); toast('Progression effacée'); }
 });
@@ -1529,6 +1647,7 @@ $('#onb').addEventListener('click', e => {
 
 /* ---------- boot ---------- */
 if (!S.profile || !S.profile.done) startOnb(); else renderHome();
+if (acct.on && acct.s) acct.refresh().then(() => { const q = new URLSearchParams(location.search).get('paid'); if (q === '1') toast('Merci ! Ton offre est active.'); if (q) history.replaceState(null, '', '/app'); });
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('/sw.js').catch(() => {});
 window.__lingovia = { get S() { return S; }, get L() { return L; }, face, av3d };
 })();
