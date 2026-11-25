@@ -2,7 +2,7 @@
   "name": "Lingovia",
   "short_name": "Lingovia",
   "description": "Apprends une langue en parlant avec ta prof. Programme de 90 jours.",
-  "start_url": "/",
+  "start_url": "/app",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#fbf7f1",

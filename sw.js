@@ -1,5 +1,5 @@
-const CACHE = 'lingovia-v26';
-const SHELL = ['/', '/index.html', '/curriculum.js', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png',
+const CACHE = 'lingovia-v27';
+const SHELL = ['/app', '/curriculum.js', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png',
   '/assets/avatar.jpg', '/assets/idle.mp4', '/assets/base.jpg', '/assets/mouth.jpg', '/assets/blink.jpg'];
 
 self.addEventListener('install', e => {
@@ -21,6 +21,6 @@ self.addEventListener('fetch', e => {
     fetch(e.request).then(r => {
       if (r.ok && r.status === 200) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); }
       return r;
-    }).catch(() => caches.match(e.request).then(m => m || caches.match('/')))
+    }).catch(() => caches.match(e.request).then(m => m || caches.match('/app')))
   );
 });

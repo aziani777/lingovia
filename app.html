@@ -1,0 +1,1537 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Lingovia</title>
+<meta name="description" content="Apprends une langue en parlant avec ta prof. Programme de 90 jours.">
+<meta name="theme-color" content="#fbf7f1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="/manifest.webmanifest">
+<script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script>
+<link rel="icon" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<style>
+:root{
+  --bg:#fbf7f1; --card:#fff; --ink:#1d2733; --muted:#6b7684; --line:#ece4d8;
+  --accent:#f26b1d; --accent-ink:#fff; --accent-soft:#fde9dc;
+  --teal:#0f5c5c; --teal-soft:#e2f0ef; --ok:#1f9d6b; --warn:#b4530a; --warn-soft:#fff3e0;
+  --r:18px; --shadow:0 6px 24px rgba(60,40,10,.08);
+  --safe-b:env(safe-area-inset-bottom,0px); --safe-t:env(safe-area-inset-top,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+  font-family:ui-rounded,"SF Pro Rounded",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.4}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;padding:0}
+#app{max-width:480px;margin:0 auto;height:100dvh;display:flex;flex-direction:column;position:relative;background:var(--bg);overflow:hidden}
+.view{flex:1;min-height:0;display:none;flex-direction:column}
+.view.on{display:flex}
+.scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 16px 24px}
+h1,h2,h3{margin:0;line-height:1.15;letter-spacing:-.01em}
+
+/* top bar */
+.top{display:flex;align-items:center;gap:10px;padding:calc(12px + var(--safe-t)) 16px 8px}
+.brand{font-weight:800;font-size:22px;letter-spacing:-.02em}
+.brand i{color:var(--accent);font-style:normal}
+.pair{margin-left:auto;font-size:13px;font-weight:700;color:var(--teal);background:var(--teal-soft);padding:6px 10px;border-radius:99px}
+.streak{font-size:13px;font-weight:700;color:var(--warn);background:var(--warn-soft);padding:6px 10px;border-radius:99px}
+
+/* hero */
+.hero{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);padding:16px;display:flex;gap:14px;align-items:center}
+.hero img{width:84px;height:84px;border-radius:50%;object-fit:cover;object-position:50% 30%;background:#e7ddcb;flex:none;border:3px solid var(--accent-soft)}
+.hero small{color:var(--muted);font-weight:600}
+.hero h2{font-size:20px;margin:2px 0 10px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:var(--accent);color:var(--accent-ink);font-weight:700;padding:12px 18px;border-radius:14px;min-height:46px}
+.btn:active{transform:scale(.98)}
+.btn.ghost{background:var(--card);color:var(--ink);border:1.5px solid var(--line)}
+.btn.teal{background:var(--teal)}
+.btn.block{display:flex;width:100%}
+.bar{height:8px;background:var(--line);border-radius:99px;overflow:hidden}
+.bar b{display:block;height:100%;background:var(--accent);border-radius:99px;transition:width .4s}
+.overall{margin:14px 2px 4px;display:flex;justify-content:space-between;font-size:13px;color:var(--muted);font-weight:600}
+
+/* phases */
+.phase{background:var(--card);border-radius:var(--r);padding:16px;margin-top:14px;box-shadow:var(--shadow)}
+.phase header{display:flex;align-items:baseline;gap:8px;margin-bottom:2px}
+.phase h3{font-size:17px}
+.lvl{font-size:11px;font-weight:800;color:var(--teal);background:var(--teal-soft);padding:3px 8px;border-radius:99px;white-space:nowrap}
+.phase p{margin:2px 0 12px;color:var(--muted);font-size:14px}
+.days{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.day{aspect-ratio:1;border-radius:14px;background:var(--bg);border:1.5px solid var(--line);font-weight:700;color:var(--muted);display:flex;align-items:center;justify-content:center;font-size:15px;position:relative}
+.day.done{background:var(--teal-soft);border-color:transparent;color:var(--teal)}
+.day.done::after{content:"✓";position:absolute;right:5px;top:2px;font-size:10px}
+.day.cur{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 4px 14px rgba(242,107,29,.4)}
+.day.lock{opacity:.5}
+
+/* tab bar */
+.tabs{display:flex;border-top:1px solid var(--line);background:var(--card);padding:6px 8px calc(6px + var(--safe-b))}
+.tabs button{flex:1;padding:8px 4px;font-size:12px;font-weight:700;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px;border-radius:12px}
+.tabs button.on{color:var(--accent)}
+.tabs svg{width:22px;height:22px}
+
+/* lesson */
+#lesson{background:#000}
+.stage{position:relative;flex:none;height:36dvh;min-height:210px;max-height:340px;background:#1b1b1b;overflow:hidden}
+.stage video,.stage img,.stage canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 22%}
+.stage #face{opacity:0;transition:opacity .18s}
+.stage.talking #face{opacity:1}
+.stage #vLive{opacity:0;transition:opacity .28s}
+.stage.talking.haslive #vLive{opacity:1}
+.stage.hastalk #vLive{opacity:0;transition:opacity .16s}
+.stage.hastalk.voiced #vLive{opacity:1}
+.stage.hastalk #face{display:none}
+.stage #vSimli{opacity:0;pointer-events:none;transition:opacity .45s}
+.stage.simli #vSimli{opacity:1}
+.stage #vReact{opacity:0;transition:opacity .22s;pointer-events:none}
+.stage.reacting #vReact{opacity:1}
+.stage.vid>img,.stage.vid #vIdle,.stage.vid #vLive,.stage.vid #face,.stage.vid #vReact{object-fit:cover;object-position:50% 16%}
+#lesson.call .stage.vid>img,#lesson.call .stage.vid #vIdle,#lesson.call .stage.vid #vLive,#lesson.call .stage.vid #face,#lesson.call .stage.vid #vReact{object-position:50% 30%}
+.stage video,.stage>img,.stage #face{transform:scale(1.035)}
+.stage #av3d{position:absolute;inset:0;opacity:0;pointer-events:none;transition:opacity .35s;overflow:hidden;background:radial-gradient(120% 90% at 50% 35%,#f7efe2 0%,#e7ddcb 45%,#b9cfc9 100%)}
+.stage #av3d canvas{position:absolute;inset:0}
+.stage.three #av3d{opacity:1}
+.stage.nophoto #vIdle,.stage.nophoto #face{visibility:hidden}
+.stage.nophoto>img{object-fit:contain;object-position:50% 40%;transform:none}
+.stage.nophoto{background:radial-gradient(120% 90% at 50% 35%,#f7efe2 0%,#e7ddcb 45%,#b9cfc9 100%)}
+.stage::after{z-index:1;content:"";position:absolute;inset:auto 0 0 0;height:120px;background:linear-gradient(transparent,rgba(0,0,0,.65));pointer-events:none}
+.stage .hud{position:absolute;left:0;right:0;top:0;padding:calc(10px + var(--safe-t)) 12px 0;display:flex;gap:8px;align-items:center;z-index:2}
+.pill{background:rgba(0,0,0,.45);color:#fff;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:99px;padding:8px 12px;font-size:13px;font-weight:700;min-height:36px;display:inline-flex;align-items:center;gap:6px}
+.stage .who{position:absolute;left:14px;bottom:26px;z-index:2;color:#fff}
+.stage .who b{font-size:18px;display:block}
+.stage .who span{font-size:12px;opacity:.9;display:flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;background:#7CFC9A}
+.stage.talking .dot{background:var(--accent);animation:pulse 1s infinite}
+.stage.thinking .dot{background:#ffd76a;animation:pulse .7s infinite}
+@keyframes pulse{50%{transform:scale(1.6);opacity:.5}}
+.sheet{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--bg);border-radius:20px 20px 0 0;margin-top:-16px;position:relative;z-index:3}
+#chat{flex:1;min-height:0;overflow-y:auto;padding:16px 14px 8px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:88%;padding:11px 14px;border-radius:18px;animation:in .25s ease}
+@keyframes in{from{opacity:0;transform:translateY(6px)}}
+.msg.me{align-self:flex-end;background:var(--teal);color:#fff;border-bottom-right-radius:6px}
+.msg.her{align-self:flex-start;background:var(--card);box-shadow:var(--shadow);border-bottom-left-radius:6px}
+.seg+.seg{margin-top:8px}
+.seg.t{cursor:pointer}
+.seg.t .tx{font-weight:700;font-size:17px;color:var(--ink)}
+.seg.t .tr{font-size:14px;color:var(--muted);margin-top:1px}
+.seg.t .tr.hid{filter:blur(5px)}
+.seg.t .act{display:flex;gap:6px;margin-top:6px}
+.chip{font-size:12px;font-weight:700;padding:5px 10px;border-radius:99px;background:var(--accent-soft);color:var(--warn);display:inline-flex;align-items:center;gap:5px;min-height:28px}
+.chip svg{width:14px;height:14px}
+.fix{align-self:stretch;background:var(--warn-soft);border:1.5px solid #ffd9a8;border-radius:16px;padding:12px 14px;animation:in .25s ease}
+.fix h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--warn)}
+.fix s{color:var(--muted)}
+.fix .good{font-weight:700;font-size:16px;margin:2px 0 4px;color:var(--ok)}
+.fix p{margin:0;font-size:14px;color:var(--ink)}
+.note{align-self:center;font-size:12px;color:var(--muted);background:var(--line);padding:6px 12px;border-radius:99px;text-align:center}
+.card{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);padding:16px}
+.card h3{font-size:19px;margin-bottom:4px}
+.card .sub{color:var(--muted);font-size:14px;margin:0 0 12px}
+.ph{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line);width:100%;text-align:left}
+.ph b{display:block;font-size:16px}
+.ph span{font-size:13px;color:var(--muted)}
+.ph svg{width:20px;height:20px;color:var(--accent);flex:none;margin-left:auto}
+.typing{display:flex;gap:4px;padding:14px}
+.typing i{width:7px;height:7px;border-radius:50%;background:var(--muted);animation:b 1s infinite}
+.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes b{50%{transform:translateY(-4px);opacity:.4}}
+#sugg{display:flex;gap:8px;overflow-x:auto;padding:4px 14px 8px;scrollbar-width:none}
+#sugg::-webkit-scrollbar{display:none}
+#sugg button{flex:none;max-width:78%;text-align:left;background:var(--card);border:1.5px solid var(--line);border-radius:14px;padding:8px 12px}
+#sugg b{display:block;font-size:14px}#sugg span{font-size:12px;color:var(--muted)}
+.composer{display:flex;align-items:center;gap:8px;padding:8px 12px calc(10px + var(--safe-b));border-top:1px solid var(--line);background:var(--card)}
+.lang{flex:none;width:44px;height:44px;border-radius:12px;background:var(--teal-soft);color:var(--teal);font-weight:800;font-size:13px}
+.composer input{flex:1;min-width:0;height:44px;border-radius:12px;border:1.5px solid var(--line);padding:0 12px;font:inherit;background:var(--bg);color:var(--ink);outline:none}
+.composer input:focus{border-color:var(--accent)}
+.mic{flex:none;width:52px;height:52px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(242,107,29,.4)}
+.mic svg{width:24px;height:24px}
+.mic.live{background:#d92d20;animation:ring 1.2s infinite}
+@keyframes ring{0%{box-shadow:0 0 0 0 rgba(217,45,32,.5)}100%{box-shadow:0 0 0 16px rgba(217,45,32,0)}}
+
+.callbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 18px calc(12px + var(--safe-b));border-top:1px solid var(--line);background:var(--card)}
+.cb{width:52px;height:52px;border-radius:50%;background:var(--bg);border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none;font-size:11px;font-weight:800;color:var(--teal)}
+.cb svg{width:22px;height:22px}
+.cb.off{background:#fde3e1;border-color:#f6b9b4;color:#b42318}
+.cb.hang{width:64px;height:64px;background:#d92d20;border-color:#d92d20;color:#fff;box-shadow:0 4px 14px rgba(217,45,32,.4)}
+.cb.hang svg{width:28px;height:28px}
+.callbar .mid{flex:1;text-align:center;font-size:12px;color:var(--muted);font-weight:700;line-height:1.3}
+.callbar .mid b{display:block;font-size:15px;color:var(--ink);font-variant-numeric:tabular-nums}
+/* full screen video call */
+#lesson.call .stage{flex:1;height:auto;max-height:none}
+#lesson.call .sheet{display:none}
+#lesson.call .stage::after{height:46%;background:linear-gradient(transparent,rgba(0,0,0,.72))}
+#lesson.call .stage::before{content:"";position:absolute;inset:0 0 auto 0;height:130px;background:linear-gradient(rgba(0,0,0,.45),transparent);z-index:1;pointer-events:none}
+#lesson.call #backBtn,#lesson.call #dayPill{display:none}
+#lesson.call .hud{justify-content:flex-end}
+#lesson.call .who{left:0;right:0;top:calc(14px + var(--safe-t));bottom:auto;text-align:center;pointer-events:none}
+#lesson.call .who b{font-size:20px}
+#lesson.call .who span{justify-content:center;font-size:13px}
+#timer:not(:empty)::before{content:"· "}
+.stage.listening .dot{background:#7CFC9A;animation:pulse 1.6s infinite}
+.cctl{position:absolute;left:0;right:0;bottom:0;z-index:4;display:flex;justify-content:space-evenly;align-items:center;padding:14px 10px calc(18px + var(--safe-b))}
+.cctl .cb{width:54px;height:54px;background:rgba(255,255,255,.18);border:0;color:#fff;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);font-size:12px}
+.cctl .cb.off{background:#fff;color:#1d2733}
+.cctl .cb.on{background:#fff;color:#1d2733}
+.cctl .cb.hang{width:66px;height:66px;background:#e5382b;color:#fff}
+.subs{position:absolute;left:14px;right:14px;bottom:calc(108px + var(--safe-b));z-index:3;display:none;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+#lesson.call .subs{display:flex}
+.subs .line{max-width:100%;background:rgba(0,0,0,.55);color:#fff;border-radius:14px;padding:9px 13px;font-size:16px;line-height:1.35;text-align:center;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);animation:in .2s ease}
+.subs .line small{display:block;font-size:13px;opacity:.8;margin-top:3px}
+.subs .line.me{background:rgba(15,92,92,.75);font-size:14px;align-self:flex-end}
+.subs .tcard{pointer-events:auto;width:100%;background:rgba(255,255,255,.96);color:var(--ink);border-radius:16px;padding:10px 14px;text-align:left;animation:in .25s ease;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.subs .tcard h4{margin:0 0 3px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--warn)}
+.subs .tcard b{display:block;font-size:17px;color:var(--teal)}
+.subs .tcard.fixc b{color:var(--ok)}
+.subs .tcard s{color:var(--muted);font-size:14px}
+.subs .tcard span{font-size:13px;color:var(--muted)}
+.stage video.pip{position:absolute;z-index:5;inset:auto;right:12px;top:calc(70px + var(--safe-t));width:96px;height:132px;border-radius:16px;object-fit:cover;object-position:center;background:#000;transform:scaleX(-1);box-shadow:0 6px 20px rgba(0,0,0,.4);border:2px solid rgba(255,255,255,.7);touch-action:none;cursor:grab}
+.lost{position:absolute;inset:0;z-index:6;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:24px}
+.lost>div{background:var(--card);border-radius:20px;padding:20px;max-width:340px;width:100%;text-align:center}
+.lost p{color:var(--muted);font-size:14px;margin:6px 0 14px}
+/* audio only */
+.orb{position:absolute;inset:0;z-index:1;display:none;align-items:center;justify-content:center;background:radial-gradient(120% 90% at 50% 35%,#16424a 0%,#0c2a30 60%,#071a1e 100%)}
+#lesson.audio .orb{display:flex}
+.orb i{width:150px;height:150px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffb27d,#f26b1d 60%,#b8480b);box-shadow:0 0 0 calc(var(--v,0) * 46px) rgba(242,107,29,.18),0 0 60px rgba(242,107,29,.45);transform:scale(calc(1 + var(--v,0) * .18));transition:transform .08s linear,box-shadow .08s linear}
+.orb b{position:absolute;color:#fff;font-size:44px;font-weight:800}
+.rowsw{display:flex;align-items:center;gap:12px;padding:12px 0 2px;border-top:1px solid var(--line);margin-top:6px}
+.rowsw div{flex:1}.rowsw b{display:block;font-size:15px}.rowsw span{font-size:13px;color:var(--muted)}
+.msg.her.tap{cursor:pointer}
+.msg.her .tr{font-size:14px;color:var(--muted);margin-top:6px;padding-top:6px;border-top:1px solid var(--line)}
+.msg.her .hint{font-size:11px;color:var(--muted);margin-top:4px;opacity:.8}
+.pc{align-self:flex-start;display:flex;align-items:center;gap:10px;background:var(--teal-soft);border-radius:14px;padding:9px 12px;max-width:88%;animation:in .25s ease;text-align:left}
+.pc b{display:block;font-size:16px;color:var(--teal)}.pc span{font-size:13px;color:var(--muted)}
+.pc svg{width:18px;height:18px;color:var(--teal);flex:none}
+.score{font-size:40px;font-weight:800;color:var(--teal);line-height:1}
+.rep h4{margin:14px 0 4px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.rep ul{margin:0;padding-left:18px}.rep li{margin:3px 0;font-size:15px}
+.rep .fx{border-top:1px solid var(--line);padding:8px 0}.rep .fx s{color:var(--muted);font-size:14px}.rep .fx b{display:block;color:var(--ok)}.rep .fx span{font-size:13px;color:var(--muted)}
+/* review + settings */
+.flash{background:var(--card);border-radius:22px;box-shadow:var(--shadow);padding:28px 20px;text-align:center;min-height:220px;display:flex;flex-direction:column;justify-content:center;gap:10px}
+.flash .q{font-size:20px;font-weight:700}
+.flash .a{font-size:24px;font-weight:800;color:var(--teal)}
+.row{display:flex;gap:10px;margin-top:14px}.row>*{flex:1}
+.set{display:flex;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)}
+.set:first-of-type{border-top:0}
+.set div{flex:1}.set b{display:block}.set span{font-size:13px;color:var(--muted)}
+.sw{width:50px;height:30px;border-radius:99px;background:var(--line);position:relative;flex:none;transition:.2s}
+.sw::after{content:"";position:absolute;left:3px;top:3px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.2);transition:.2s}
+.sw.on{background:var(--accent)}.sw.on::after{left:23px}
+input[type=range]{width:120px;accent-color:var(--accent)}
+/* onboarding */
+#onb{background:var(--bg)}
+.obtop{display:flex;align-items:center;gap:10px;padding:calc(14px + var(--safe-t)) 14px 6px}
+.obtop button{min-width:40px;height:40px;font-weight:700;color:var(--muted);font-size:14px}
+#obBack{font-size:28px;line-height:1}
+.obbar{flex:1;display:flex;gap:5px}
+.obbar i{flex:1;height:5px;border-radius:99px;background:var(--line);overflow:hidden;position:relative}
+.obbar i b{position:absolute;inset:0;background:var(--accent);border-radius:99px;transform-origin:left;transition:transform .3s}
+.obbar i.full b{background:var(--ok)}
+#obBody{padding:18px 20px 20px;display:flex;flex-direction:column;align-items:center}
+#obBody h1{font-size:27px;text-align:center;margin:8px 0 6px;letter-spacing:-.02em;line-height:1.15}
+#obBody .lead{color:var(--muted);text-align:center;margin:0 0 20px;font-size:15px;max-width:340px}
+.opts{width:100%;max-width:380px;display:flex;flex-direction:column;gap:10px}
+.opt{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--card);border:2px solid transparent;border-radius:18px;padding:14px 16px;font-weight:600;font-size:16px;box-shadow:0 2px 10px rgba(60,40,10,.05)}
+.opt .em{font-size:24px;width:30px;text-align:center;flex:none}
+.opt small{display:block;font-weight:500;color:var(--muted);font-size:13px;margin-top:1px}
+.opt.sel{border-color:var(--accent);background:var(--accent-soft)}
+.obin{width:100%;max-width:380px;height:56px;border-radius:16px;border:2px solid var(--line);background:var(--card);padding:0 16px;font:inherit;font-size:19px;font-weight:600;color:var(--ink);outline:none;margin-bottom:18px;text-align:center}
+.obin:focus{border-color:var(--accent)}
+.chips{display:flex;flex-wrap:wrap;gap:9px;justify-content:center;max-width:400px}
+.wchip{padding:10px 15px;border-radius:99px;background:var(--card);font-weight:600;font-size:15px;box-shadow:0 2px 8px rgba(60,40,10,.05)}
+.wchip.sel{background:var(--ok);color:#fff}
+.obfoot{padding:8px 20px calc(16px + var(--safe-b));display:flex;flex-direction:column;gap:8px;align-items:center}
+.obfoot:empty{display:none}
+.obfoot .btn{width:100%;max-width:380px;min-height:54px;border-radius:99px;font-size:16px}
+.obfoot .btn[disabled]{opacity:.4}
+.obfoot label{display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px;color:var(--muted);padding:4px}
+.obinfo{background:linear-gradient(180deg,var(--accent-soft),transparent);border-radius:24px;padding:22px 18px;width:100%;max-width:380px;text-align:center}
+.obinfo p{margin:0;font-size:16px;line-height:1.45}
+.faces{display:flex;justify-content:center;margin:18px 0 4px}
+.faces img{width:64px;height:64px;border-radius:50%;object-fit:cover;border:3px solid var(--bg);margin-left:-14px;background:#e7ddcb}
+.faces img:first-child{margin-left:0}
+.tcardb{width:100%;max-width:340px;border-radius:26px;overflow:hidden;background:var(--card);box-shadow:var(--shadow);position:relative}
+.tcardb img{width:100%;aspect-ratio:1;object-fit:cover;display:block;background:#e7ddcb}
+.tcardb .inf{padding:14px 16px 16px}
+.tcardb h3{font-size:22px}
+.tcardb p{margin:4px 0 10px;color:var(--muted);font-size:14px}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tags span{font-size:12px;font-weight:700;padding:4px 9px;border-radius:99px;background:var(--teal-soft);color:var(--teal)}
+.play{display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:13px;color:var(--accent);background:var(--accent-soft);border-radius:99px;padding:7px 12px;min-height:34px}
+.play svg{width:15px;height:15px}
+.trow{display:flex;gap:12px;align-items:center;width:100%;max-width:400px;background:var(--card);border:2px solid transparent;border-radius:20px;padding:10px;text-align:left;box-shadow:0 2px 10px rgba(60,40,10,.05)}
+.trow.sel{border-color:var(--accent)}
+.trow img{width:78px;height:78px;border-radius:16px;object-fit:cover;flex:none;background:#e7ddcb}
+.trow b{font-size:17px;display:block}.trow small{color:var(--muted);font-size:13px;display:block;margin:1px 0 6px}
+.sum{width:100%;max-width:380px;background:var(--card);border-radius:20px;box-shadow:var(--shadow);padding:6px 16px}
+.sum div{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-top:1px solid var(--line);font-size:15px}
+.sum div:first-child{border-top:0}.sum span{color:var(--muted)}.sum b{text-align:right}
+.mins{display:flex;gap:8px;justify-content:center;margin:14px 0 4px}
+.mins button{width:62px;height:48px;border-radius:14px;background:var(--card);font-weight:700;border:2px solid transparent;box-shadow:0 2px 8px rgba(60,40,10,.05)}
+.mins button.sel{border-color:var(--accent);background:var(--accent-soft)}
+.pick{display:flex;gap:10px;overflow-x:auto;padding:4px 0}
+.pick button{flex:none;text-align:center;font-size:12px;font-weight:700;color:var(--muted)}
+.pick img{width:58px;height:58px;border-radius:50%;object-fit:cover;display:block;border:3px solid transparent;margin-bottom:3px;background:#e7ddcb}
+.pick button.sel{color:var(--accent)}.pick button.sel img{border-color:var(--accent)}
+.empty{text-align:center;color:var(--muted);padding:40px 20px}
+#toast{position:absolute;left:50%;bottom:90px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:10px 16px;border-radius:99px;font-size:14px;font-weight:600;opacity:0;pointer-events:none;transition:.25s;z-index:20;max-width:88%;text-align:center}
+#toast.on{opacity:1;transform:translateX(-50%)}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HOME -->
+  <section class="view on" id="home">
+    <div class="top">
+      <div class="brand">Lingo<i>via</i></div>
+      <span class="pair" id="pairTag">NL · FR</span>
+      <span class="streak" id="streakTag">0 jour</span>
+    </div>
+    <div class="scroll" id="homeBody"></div>
+  </section>
+
+  <!-- REVIEW -->
+  <section class="view" id="review">
+    <div class="top"><div class="brand">Réviser</div><span class="pair" id="dueTag"></span></div>
+    <div class="scroll" id="reviewBody"></div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="view" id="settings">
+    <div class="top"><div class="brand">Réglages</div></div>
+    <div class="scroll" id="settingsBody"></div>
+  </section>
+
+  <!-- ONBOARDING -->
+  <section class="view" id="onb">
+    <div class="obtop"><button id="obBack" aria-label="Retour">‹</button><div class="obbar" id="obBar"></div><button id="obSkip">Passer</button></div>
+    <div class="scroll" id="obBody"></div>
+    <div class="obfoot" id="obFoot"></div>
+  </section>
+
+  <!-- LESSON -->
+  <section class="view" id="lesson">
+    <div class="stage" id="stage">
+      <img src="" alt="">
+      <video id="vIdle" muted loop playsinline preload="auto"></video>
+      <video id="vLive" muted loop playsinline preload="auto"></video>
+      <canvas id="face" width="540" height="960"></canvas>
+      <video id="vReact" muted playsinline preload="auto"></video>
+      <video id="vSimli" playsinline autoplay></video><audio id="aSimli" autoplay></audio>
+      <div id="av3d"></div>
+      <div class="hud">
+        <button class="pill" id="backBtn" aria-label="Retour">‹ Parcours</button>
+        <span class="pill" id="dayPill" style="margin-left:auto"></span>
+        <button class="pill" id="endBtn" hidden>Terminer</button>
+        <button class="pill" id="helpBtn" hidden>Aide</button>
+      </div>
+      <div class="who"><b id="tutorName">Sanne</b><span><i class="dot"></i><em id="status" style="font-style:normal">À l'écoute</em><em id="timer" style="font-style:normal"></em><em id="liveTag" hidden style="font-style:normal;margin-left:6px;padding:1px 6px;border-radius:6px;background:#e5484d;color:#fff;font-size:10px;font-weight:700;letter-spacing:.04em">LIVE</em></span></div>
+      <div class="orb" id="orb"><i></i><b></b></div>
+      <video class="pip" id="pip" playsinline muted hidden></video>
+      <div class="lost" id="lost" hidden><div><b>Connexion perdue</b><p>L'appel a été coupé. Ta conversation est conservée.</p>
+        <button class="btn block" id="resumeBtn">Reprendre l'appel</button><button class="btn block ghost" id="stopBtn" style="margin-top:8px">Terminer et voir le bilan</button></div></div>
+      <div class="subs" id="subs"></div>
+      <div class="cctl" id="cctl" hidden>
+        <button class="cb" id="muteBtn" aria-label="Couper le micro"></button>
+        <button class="cb" id="camBtn" aria-label="Caméra"></button>
+        <button class="cb" id="spkBtn" aria-label="Haut-parleur"></button>
+        <button class="cb" id="ccBtn" aria-label="Sous-titres"></button>
+        <button class="cb hang" id="hangBtn" aria-label="Raccrocher"></button>
+      </div>
+    </div>
+    <div class="sheet">
+      <div id="chat"></div>
+      <div id="sugg"></div>
+      <div class="composer" id="composer" hidden>
+        <button class="lang" id="langBtn" aria-label="Langue du micro">NL</button>
+        <input id="txt" type="text" placeholder="Écris ou parle…" autocomplete="off" autocapitalize="sentences" enterkeyhint="send">
+        <button class="mic" id="micBtn" aria-label="Parler"></button>
+      </div>
+    </div>
+  </section>
+
+  <nav class="tabs" id="tabs">
+    <button data-v="home" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v13M4 19a2 2 0 0 0 2 2h14M9 8h6M9 12h6"/></svg>Parcours</button>
+    <button data-v="review"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="14" height="14" rx="2"/><path d="M7 2h12a2 2 0 0 1 2 2v12"/></svg>Réviser</button>
+    <button data-v="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>Réglages</button>
+  </nav>
+  <div id="toast"></div>
+</div>
+
+<script src="/curriculum.js"></script>
+<script src="/avatars.js"></script>
+<script src="/onboarding.js"></script>
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ICON = {
+  spk: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>',
+  mic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',
+  send: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+  stop: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>',
+  micOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 9v2a3 3 0 0 0 5 2.2M15 9.5V6a3 3 0 0 0-5.7-1.3M5 11a7 7 0 0 0 11.5 5.3M19 11a7 7 0 0 1-.6 2.8M12 18v3M3 3l18 18"/></svg>',
+  cam: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="13" height="12" rx="2.5"/><path d="m16 10 5-3v10l-5-3"/></svg>',
+  camOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h4.500a2.500 2.500 0 0 1 2.500 2.500V12m0 4.500a2.500 2.500 0 0 1-2.500 1.500h-8A2.500 2.500 0 0 1 3 15.500v-7A2.500 2.500 0 0 1 4.300 6.300M16 10l5-3v10l-3-1.800M3 3l18 18"/></svg>',
+  spkOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4zM16 9.500l5 5M21 9.500l-5 5"/></svg>',
+  hang: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 9c-3.2 0-6.2.9-8.6 2.500-.9.6-1.200 1.800-.800 2.800l.8 1.900c.3.8 1.200 1.200 2 .9l2.600-.9c.7-.2 1.200-.900 1.200-1.700v-1.300c1.800-.5 3.800-.5 5.600 0v1.300c0 .8.5 1.500 1.200 1.700l2.600.9c.8.3 1.700-.1 2-.9l.8-1.900c.4-1 .1-2.200-.8-2.800C18.200 9.900 15.200 9 12 9z"/></svg>',
+};
+
+/* ---------- state ---------- */
+const KEY = 'lingovia.v1';
+const DEF = { pair: 'nl-fr', done: {}, streak: 0, last: '', cards: [], set: { rate: 0.85, showTr: true, unlockAll: false, three: true, avatar: 'sanne', subs: 1, audioOnly: false } };
+let S;
+try { S = Object.assign({}, DEF, JSON.parse(localStorage.getItem(KEY) || '{}')); S.set = Object.assign({}, DEF.set, S.set); }
+catch { S = structuredClone(DEF); }
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} };
+const C = () => window.COURSES[S.pair] || window.COURSES['nl-fr'];
+const AV = () => window.AVATARS.find(a => a.id === S.set.avatar) || window.AVATARS[0];
+const tutorVoice = () => (S.profile && S.profile.variant === 'be' && AV().voiceBE) || AV().voice;
+const today = () => new Date().toISOString().slice(0, 10);
+const doneCount = () => Object.keys(S.done).length;
+const startDay = () => S.start || 1;
+const currentDay = () => { for (let d = startDay(); d <= 90; d++) if (!S.done[d]) return d; return 90; };
+const unlocked = d => S.set.unlockAll || d <= startDay() || S.done[d - 1] || S.done[d];
+const phaseOf = d => C().phases.find(p => d >= p.from && d <= p.to);
+const dayInfo = d => { const r = C().days[d - 1]; return { n: d, title: r[0], focus: r[1], scenario: r[2], phrases: r[3].map(p => ({ target: p[0], native: p[1] })), level: phaseOf(d).level }; };
+
+let toastT;
+function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2400); }
+
+/* ---------- navigation ---------- */
+function show(v) {
+  document.querySelectorAll('.view').forEach(e => e.classList.toggle('on', e.id === v));
+  $('#tabs').style.display = v === 'lesson' || v === 'onb' ? 'none' : 'flex';
+  if (v === 'onb') renderOnb();
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  if (v === 'home') renderHome();
+  if (v === 'review') renderReview();
+  if (v === 'settings') renderSettings();
+}
+$('#tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) show(b.dataset.v); });
+
+/* ---------- home ---------- */
+function renderHome() {
+  const c = C(), cur = currentDay(), info = dayInfo(cur), n = doneCount();
+  $('#pairTag').textContent = `${c.target.code.toUpperCase()} · ${c.native.code.toUpperCase()}`;
+  $('#streakTag').textContent = `${S.streak} jour${S.streak > 1 ? 's' : ''} de suite`;
+  let h = `<div class="hero"><img src="${esc(AV().thumb)}" alt="${esc(AV().name)}"><div style="flex:1;min-width:0">
+    <small>${n >= 90 ? 'Programme terminé' : `Jour ${cur} sur 90 · ${esc(info.level)}`}</small>
+    <h2>${esc(info.title)}</h2>
+    <button class="btn" data-day="${cur}">${n ? 'Continuer' : 'Commencer'} avec ${esc(AV().name)}</button></div></div>
+    <div class="overall"><span>Ta progression</span><span>${n} / 90 jours</span></div>
+    <div class="bar"><b style="width:${n / 90 * 100}%"></b></div>`;
+  for (const p of c.phases) {
+    h += `<div class="phase"><header><h3>${esc(p.name)}</h3><span class="lvl">${esc(p.level)}</span></header><p>${esc(p.goal)}</p><div class="days">`;
+    for (let d = p.from; d <= p.to; d++) {
+      const cls = S.done[d] ? 'done' : d === cur ? 'cur' : unlocked(d) ? '' : 'lock';
+      h += `<button class="day ${cls}" data-day="${d}" aria-label="Jour ${d}">${d}</button>`;
+    }
+    h += `</div></div>`;
+  }
+  $('#homeBody').innerHTML = h;
+}
+$('#homeBody').addEventListener('click', e => {
+  const b = e.target.closest('[data-day]'); if (!b) return;
+  const d = +b.dataset.day;
+  if (!unlocked(d)) return toast(`Termine d'abord le jour ${d - 1}`);
+  openLesson(d);
+});
+
+/* ---------- speech out ---------- */
+const synth = window.speechSynthesis;
+let voices = [];
+const loadVoices = () => { if (synth) voices = synth.getVoices(); };
+loadVoices(); if (synth) synth.onvoiceschanged = loadVoices;
+const NICE = /ellen|claire|fenna|colette|lotte|xander|amelie|amélie|audrey|marie|aurelie|aurélie|google|natural|enhanced|premium/i;
+function voiceFor(which) {
+  const prefs = C()[which].voice, code = C()[which].code;
+  const pool = voices.filter(v => v.lang && v.lang.toLowerCase().replace('_', '-').startsWith(code));
+  if (!pool.length) return null;
+  pool.sort((a, b) => (NICE.test(b.name) - NICE.test(a.name)) || (prefs.indexOf(a.lang) < 0 ? 9 : prefs.indexOf(a.lang)) - (prefs.indexOf(b.lang) < 0 ? 9 : prefs.indexOf(b.lang)));
+  return pool[0];
+}
+let speakRun = 0, elOK = null, stopClip = null;
+const player = new Audio(), clips = new Map();
+// a few silent samples, played inside a tap so iOS lets later audio through
+const SILENCE = URL.createObjectURL(new Blob([Uint8Array.from(atob('UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQQAAAAAAAAA'), c => c.charCodeAt(0))], { type: 'audio/wav' }));
+let actx = null, analyser = null, abuf = null;
+function unlockAudio() {
+  try { player.src = SILENCE; player.play().catch(() => {}); } catch {}
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC && !actx) { actx = new AC(); analyser = actx.createAnalyser(); analyser.fftSize = 512; analyser.smoothingTimeConstant = 0.35; abuf = new Uint8Array(analyser.fftSize);
+      actx.createMediaElementSource(player).connect(analyser); analyser.connect(actx.destination); face.attach(analyser); }
+    if (actx && actx.state !== 'running') actx.resume().catch(() => {});
+  } catch {}
+  if (synth) { try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; synth.speak(u); } catch {} }
+}
+async function clip(text, speed) {
+  const voice = tutorVoice(), k = voice + '|' + speed + '|' + text;
+  if (clips.has(k)) return clips.get(k);
+  if (elOK === false) return null;
+  try {
+    const r = await fetch('/api/speak', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, speed, voice }) });
+    if (!r.ok) { if (r.status !== 429 && r.status < 500 || r.status === 501 || r.status === 503) elOK = false; return null; }
+    elOK = true;
+    const url = URL.createObjectURL(await r.blob());
+    clips.set(k, url); return url;
+  } catch { return null; }
+}
+const playClip = url => new Promise(res => {
+  const end = () => { player.onended = player.onerror = null; stopClip = null; res(); };
+  stopClip = () => { player.pause(); end(); };
+  player.onended = player.onerror = end; player.src = url; player.play().catch(end);
+});
+const synthSay = (it, slow) => new Promise(res => {
+  if (!synth) return res();
+  const u = new SpeechSynthesisUtterance(it.text), v = voiceFor(it.lang);
+  if (v) u.voice = v;
+  u.lang = v ? v.lang : C()[it.lang].voice[0];
+  u.rate = it.lang === 'target' ? (slow ? 0.6 : S.set.rate) : 1;
+  let fired = false;
+  const go = () => { if (!fired) { fired = true; clearTimeout(guard); res(); } };
+  // some browsers never fire onend; fall back to an estimate
+  const guard = setTimeout(go, 1500 + it.text.length * 110 / u.rate);
+  u.onend = go; u.onerror = go; synth.speak(u);
+});
+function setTalking(on) { $('#stage').classList.toggle('talking', on); if (on) $('#status').textContent = 'Parle'; else if (!$('#stage').classList.contains('thinking')) $('#status').textContent = 'À l\'écoute'; }
+function stopSpeaking() { speakRun++; if (stopClip) stopClip(); if (synth) synth.cancel(); if (!(L && L.conv)) setTalking(false); }
+// items: [{lang:'target'|'native', text}], spoken one after the other
+async function speak(items, slow) {
+  stopSpeaking();
+  if (!items.length || (L && L.conv)) return;
+  const run = ++speakRun;
+  stopListening();
+  if (analyser) face.attach(analyser);
+  for (const it of items) {
+    const speed = it.lang === 'target' ? (slow ? 0.75 : Math.min(1.2, Math.max(0.7, S.set.rate + 0.1))) : 1;
+    const url = await clip(it.text, speed);
+    if (run !== speakRun) return;
+    setTalking(true); face.fake = !url;
+    await (url ? playClip(url) : synthSay(it, slow));
+    face.fake = false;
+    if (run !== speakRun) return;
+  }
+  setTalking(false);
+}
+
+/* ---------- 3D avatar (TalkingHead, MIT) ---------- */
+const av3d = (() => {
+  let head = null, booting = null, shown = null, lastEnd = 0, token = 0, THREE = null;
+  const hair = { on: false, u: null, bone: null, p: null, v: null, x: null, tmp: null, t: 0 };
+  const REACT = { smile: '😊', laugh: '😄', surprised: '😳', thinking: '🤔', wink: '😉', nod: 'yes', shake_head: 'no', wave: '👋',
+    thumbs_up: '👍', ok: '👌', shrug: '🤷', proud: '🥰', oops: '😬' };
+  const on = () => !!head && $('#stage').classList.contains('three');
+  function boot() {
+    return booting || (booting = (async () => {
+      const { TalkingHead } = await import('/vendor/talkinghead/talkinghead.mjs');
+      THREE = await import('three');
+      head = new TalkingHead($('#av3d'), { update: dt => hairTick(dt), ttsEndpoint: null, lipsyncModules: [], cameraView: 'head', cameraDistance: 0.4, cameraY: 0.09,
+        cameraRotateEnable: false, modelFPS: 30, modelPixelRatio: Math.min(2, window.devicePixelRatio || 1),
+        avatarIdleEyeContact: 0.6, avatarSpeakingEyeContact: 0.8, avatarSpeakingHeadMove: 0.6, lightAmbientIntensity: 2, lightDirectIntensity: 20 });
+      return true;
+    })().catch(() => { booting = null; head = null; return false; }));
+  }
+  async function show() {
+    const a = AV(), my = ++token;
+    if (!a.video) { $('#stage').classList.add('nophoto'); $('#stage').querySelector(':scope > img').src = a.thumb; }
+    if (a.video) return hide();          // video tutors are drawn by the face renderer
+    if (!S.set.three) return hide();
+    if (!(await boot()) || my !== token) return;
+    if (shown !== a.id) {
+      $('#stage').classList.remove('three');
+      try { await head.showAvatar({ url: a.model, lipsyncLang: 'en', ...a.opts }); shown = a.id; hairSetup(a); dress(a); }
+      catch { shown = null; return; }
+      if (my !== token) return;
+    }
+    try { head.start(); } catch {}
+    $('#stage').classList.add('three'); view($('#lesson').classList.contains('call'));
+  }
+  /* Hair: the models have no hair bones, so the strands are moved in the shader. The further a strand hangs
+     below the top of the head, the more it lags behind the head's movement, on a small damped spring. */
+  function dress(a) {
+    try { for (const [pat, col] of a.tint || []) head.armature.traverse(o => { if (o.isMesh && o.name.toLowerCase().includes(pat.toLowerCase())) {
+      o.material = Array.isArray(o.material) ? o.material.map(m => m.clone()) : o.material.clone();
+      for (const m of [].concat(o.material)) m.color.set(col); } }); } catch {}
+  }
+  function hairSetup(a) {
+    hair.on = false; const grey = !!(a && a.greyHair);
+    try {
+      const meshes = []; hair.bone = null;
+      head.armature.traverse(o => { if (o.isBone && o.name === 'Head') hair.bone = o; if (o.isMesh && /hair/i.test(o.name)) meshes.push(o); });
+      if (!meshes.length || !hair.bone) return;
+      hair.u = { uSway: { value: new THREE.Vector3() }, uTopY: { value: 10 } };
+      hair.p = null; hair.v = new THREE.Vector3(); hair.x = new THREE.Vector3(); hair.tmp = new THREE.Vector3();
+      for (const m of meshes) for (const mat of (Array.isArray(m.material) ? m.material : [m.material])) {
+        mat.onBeforeCompile = sh => {
+          Object.assign(sh.uniforms, hair.u);
+          sh.vertexShader = 'uniform vec3 uSway;\nuniform float uTopY;\n' + sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
+            vec4 hwp = modelMatrix * vec4( transformed, 1.0 );
+            float hw = clamp( ( uTopY - hwp.y ) / 0.32, 0.0, 1.0 ); hw *= hw;
+            mvPosition += viewMatrix * vec4( uSway * hw, 0.0 );
+            gl_Position = projectionMatrix * mvPosition;`);
+          if (grey) sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+            float hg = dot( diffuseColor.rgb, vec3( 0.3, 0.59, 0.11 ) );
+            diffuseColor.rgb = mix( diffuseColor.rgb, vec3( hg ) * 2.1 + 0.08, 0.92 );`);
+        };
+        mat.needsUpdate = true;
+      }
+      hair.on = true;
+    } catch { hair.on = false; }
+  }
+  function hairTick(dt) {
+    if (!hair.on || !dt) return;
+    const h = hair, s = Math.min(0.05, dt / 1000); h.t += s;
+    h.bone.getWorldPosition(h.tmp);
+    h.u.uTopY.value = h.tmp.y + 0.04;                       // strands start moving a little below the crown
+    const f = new THREE.Vector3(0, 0, 0.12).applyQuaternion(h.bone.getWorldQuaternion(new THREE.Quaternion())).add(h.tmp); // a point in front of the face
+    if (!h.p) { h.p = f.clone(); return; }
+    const vel = f.clone().sub(h.p).divideScalar(s); h.p.copy(f);
+    const target = vel.multiplyScalar(-0.05); target.y *= 0.3; target.clampLength(0, 0.035);
+    target.x += Math.sin(h.t * 1.3) * 0.0015; target.z += Math.sin(h.t * 0.9 + 1) * 0.001;   // a hint of air
+    // damped spring towards the target
+    h.v.add(target.sub(h.x).multiplyScalar(90 * s)).multiplyScalar(Math.max(0, 1 - 9 * s));
+    h.x.add(h.v.clone().multiplyScalar(s));
+    h.u.uSway.value.copy(h.x);
+  }
+  function hide() { token++; $('#stage').classList.remove('three'); if (head) { try { head.stop(); } catch {} } }
+  // call: waist-up so the hands are visible. lesson card: face only.
+  function view(call) { if (!head) return; try { head.setView(call ? 'upper' : 'head', call ? { cameraDistance: 0.2, cameraY: 0.06 } : { cameraDistance: 0.4, cameraY: 0.09 }); } catch {} }
+  function set(k, v) { if (!on()) return; const m = head.mtAvatar && head.mtAvatar[k]; if (m) { m.newvalue = v; m.needsUpdate = true; } }
+  // a new sentence: look at the learner and gesture, like a person starting to talk
+  function sentence() { if (!on()) return; if (Date.now() - lastEnd > 400) { try { head.lookAtCamera(600); head.speakWithHands(); } catch {} } }
+  function ended() { lastEnd = Date.now(); }
+  // facial expression or gesture, by name (see REACT)
+  function react(name, dur) {
+    if (!on()) return;
+    let g = REACT[name]; if (!g) return;
+    if (name === 'shrug') g = AV().gender === 'M' ? '🤷‍♂️' : '🤷‍♀️';
+    try { head.playGesture(g, dur || 3); } catch {}
+  }
+  function mood(m) { if (!on()) return; try { head.setMood(m || AV().mood || 'neutral'); } catch {} }
+  function look() { if (on()) { try { head.lookAtCamera(1200); } catch {} } }
+  return { show, hide, view, set, sentence, ended, react, mood, look, on, hair, reactions: Object.keys(REACT), get head() { return head; },
+    peek: k => head && head.mtAvatar && head.mtAvatar[k] ? head.mtAvatar[k].value : null };
+})();
+
+/* ---------- face: mouth shapes driven by the voice ---------- */
+const face = (() => {
+  // sprite sheet: 3 rows (rounded, neutral, wide lips) x 6 columns (closed to open)
+  let track = null, fps = 24, vfTime = -1, live = null, liveTime = -1, wasTalking = false;
+  let talkClips = [], talkAt = 0, lastVoice = 0, voiced = false;
+  let M = null, B = null, CW = 540, CH = 960, base = null, mouth = null, blink = null, loaded = '', clips = {}, pending = null, reactEnd = 0;
+  const cv = $('#face'), g = cv.getContext('2d');
+  const tmp = document.createElement('canvas'), tg = tmp.getContext('2d');
+  const img = src => { const i = new Image(); i.src = src; return i; };
+  // load a video tutor: base frame, mouth and blink sprites, idle loop and reaction clips
+  async function use(a) {
+    const stage = $('#stage'), v = a && a.video;
+    stage.classList.toggle('vid', !!v); stage.classList.remove('reacting'); pending = null;
+    if (!v) { loaded = ''; M = null; live = null; talkClips = []; stage.classList.remove('haslive', 'hastalk', 'voiced'); return; }
+    stage.classList.remove('nophoto', 'three');
+    stage.querySelector(':scope > img').src = v.dir + 'base.jpg';
+    const idle = $('#vIdle'); if (!idle.src.endsWith(v.dir + 'idle.mp4')) { idle.poster = v.dir + 'base.jpg'; idle.src = v.dir + 'idle.mp4'; }
+    idle.play().catch(() => {});
+    // which frame of the loop is on screen right now, so the drawn face lands exactly on the head
+    if (idle.requestVideoFrameCallback && !idle._vf) { idle._vf = true; const cb = (n, md) => { vfTime = md.mediaTime; idle.requestVideoFrameCallback(cb); }; idle.requestVideoFrameCallback(cb); }
+    clips = v.clips || {};
+    if (loaded === a.id) return;
+    try {
+      const meta = await (await fetch(v.dir + 'face.json')).json();
+      CW = meta.w; CH = meta.h; cv.width = CW; cv.height = CH; tmp.width = meta.mouth.w; tmp.height = meta.mouth.h;
+      base = img(v.dir + 'base.jpg'); mouth = img(v.dir + 'mouth.webp'); blink = img(v.dir + 'blink.jpg');
+      M = meta.mouth; B = meta.blink; track = meta.track || null; fps = meta.fps || 24; loaded = a.id;
+      talkClips = (v.talk || []).map(f => v.dir + f); talkAt = 0;
+      stage.classList.toggle('hastalk', talkClips.length > 0); stage.classList.remove('voiced');
+      live = !talkClips.length && v.live && meta.live ? meta.live : null;
+      const lv = $('#vLive'); stage.classList.toggle('haslive', !!live);
+      if (talkClips.length) { lv.src = talkClips[0]; lv.load(); for (const c of talkClips) fetch(c).catch(() => {}); }
+      if (live) { lv.src = v.dir + v.live; lv.load(); if (lv.requestVideoFrameCallback && !lv._vf) { lv._vf = true; const cb = (n, md) => { liveTime = md.mediaTime; lv.requestVideoFrameCallback(cb); }; lv.requestVideoFrameCallback(cb); } } else if (!talkClips.length) lv.removeAttribute('src');
+      for (const c of Object.values(clips)) fetch(v.dir + c).catch(() => {});   // warm the cache
+    } catch { M = null; }
+  }
+  // a reaction clip (wave, thumbs up, laugh). It waits for the end of the sentence so the lips never freeze mid-word.
+  function react(name) {
+    const file = clips[name]; if (!file || !loaded) return false;
+    if ($('#stage').classList.contains('talking')) { pending = { name, t: performance.now() }; return true; }
+    const v = $('#vReact'), dir = AV().video.dir;
+    v.src = dir + file; v.currentTime = 0;
+    v.onended = () => $('#stage').classList.remove('reacting');
+    v.play().then(() => { $('#stage').classList.add('reacting'); reactEnd = performance.now() + 5200; }).catch(() => {});
+    return true;
+  }
+  let raf = 0, open = 0, prev = 0, peak = 0.05, shape = 1, shapeTo = 1, cLo = 1e9, cHi = 0, wasOpen = false;
+  let nextBlink = 0, blinkAt = -1, fbuf = null, lastT = 0;
+  const api = { fake: false, start, stop, attach, use, react, state: () => ({ on: !!head, mouth: +open.toFixed(2), level: +rms().toFixed(3), open: +vOpen.toFixed(2), shape: +vShape.toFixed(2), top: head ? Object.entries(head.w).sort((a, b) => b[1] - a[1])[0] : null }) };
+
+  // Sound-by-sound mouth shapes (HeadAudio, MIT). Each detected sound maps to [lip shape row, openness].
+  const VIS = { viseme_sil: [1, 0], viseme_PP: [1, 0], viseme_FF: [1, 0.7], viseme_TH: [1, 1.2], viseme_DD: [1, 1.5], viseme_kk: [1, 1.8],
+    viseme_nn: [1, 1.4], viseme_RR: [0.3, 1.6], viseme_CH: [0, 1.5], viseme_SS: [2, 1.1], viseme_aa: [1, 4.2], viseme_E: [2, 2.7],
+    viseme_I: [2, 1.7], viseme_O: [0, 3.1], viseme_U: [0, 1.7] };
+  const heads = new Map(); let HA = null, head = null, vOpen = 0, vShape = 1;
+  let srcAn = null, tbuf = null, env = 0; const line = [];
+  // loudness of the voice right now (last 20 ms), read from the raw signal so it has no smoothing delay
+  function rms() {
+    if (!srcAn) return 0;
+    try {
+      if (!tbuf || tbuf.length !== srcAn.fftSize) tbuf = new Uint8Array(srcAn.fftSize);
+      srcAn.getByteTimeDomainData(tbuf);
+      const n = tbuf.length, from = Math.max(0, n - 1024); let e = 0;
+      for (let i = from; i < n; i++) { const d = (tbuf[i] - 128) / 128; e += d * d; }
+      return Math.sqrt(e / (n - from));
+    } catch { return 0; }
+  }
+  async function attach(an) {
+    if (an && an.getByteTimeDomainData) srcAn = an;
+    try {
+      const ctx = an && an.context;
+      if (!ctx || !ctx.audioWorklet) return;
+      let h = heads.get(ctx);
+      if (!h) {
+        HA = HA || import('/vendor/headaudio/headaudio.min.mjs');
+        const { HeadAudio } = await HA;
+        await ctx.audioWorklet.addModule('/vendor/headaudio/headworklet.min.mjs');
+        // each mouth shape is held and eased in, so the lips do not flicker
+        const node = new HeadAudio(ctx, { visemeMinMs: 190, visemeRampMs: 180, parameterData: { vadGateActiveDb: -40, vadGateInactiveDb: -60 } });
+        await node.loadModel('/vendor/headaudio/model-en-mixed.bin');
+        h = { node, w: {}, an: new WeakSet() };
+        node.onvalue = (k, v) => { h.w[k] = v; av3d.set(k, v); };
+        node.onstarted = () => av3d.sentence(); node.onended = () => av3d.ended();
+        heads.set(ctx, h);
+      }
+      if (!h.an.has(an)) { an.connect(h.node); h.an.add(an); }
+      head = h;
+    } catch (e) { head = null; }
+  }
+  // blends the active sounds into one target; returns false while no sound is recognised
+  function visemes(dt) {
+    if (!head) return false;
+    try { head.node.update(dt); } catch { return false; }
+    let sum = 0, r = 0, k = 0;
+    for (const n in VIS) { const w = head.w[n] || 0; if (w > 0.01) { sum += w; r += w * VIS[n][0]; k += w * VIS[n][1]; } }
+    if (sum < 0.05) { vOpen += (0 - vOpen) * 0.14; return true; }
+    const strength = Math.min(1, sum / 0.6);
+    vOpen += (k / sum * strength * 0.85 - vOpen) * 0.17; vShape += (r / sum - vShape) * 0.1;
+    return true;
+  }
+
+  // returns [loudness 0..1+, brightness of the sound or -1 when unknown]
+  function listen(t) {
+    let f = null, v = 0;
+    if (L && L.conv) {
+      try { f = L.conv.getOutputByteFrequencyData(); } catch {}
+      try { v = L.conv.getOutputVolume() || 0; } catch {}
+    } else if (api.fake) {
+      v = 0.5 + 0.5 * Math.sin(t / 95) * Math.sin(t / 240); return [v < 0.42 ? 0 : v, -1];
+    } else if (analyser && !player.paused) {
+      if (!fbuf) fbuf = new Uint8Array(analyser.frequencyBinCount);
+      analyser.getByteFrequencyData(fbuf); f = fbuf;
+    }
+    if (!f || !f.length) return [v, -1];
+    let e = 0, c = 0; const n = Math.min(f.length, 96);
+    for (let i = 1; i < n; i++) { const a = f[i] * f[i]; e += a; c += a * i; }
+    const loud = Math.sqrt(e / (n - 1)) / 255;
+    return [v || loud * 1.6, e > 0 ? c / e : -1];
+  }
+  function row(r, k0, k1, a, ctx, dx, dy) {
+    ctx.globalAlpha = 1; ctx.drawImage(mouth, k0 * M.w, r * M.h, M.w, M.h, dx, dy, M.w, M.h);
+    if (a > 0.02) { ctx.globalAlpha = a; ctx.drawImage(mouth, k1 * M.w, r * M.h, M.w, M.h, dx, dy, M.w, M.h); ctx.globalAlpha = 1; }
+  }
+  function frame(t) {
+    raf = requestAnimationFrame(frame);
+    const stage0 = $('#stage');
+    if (pending && !stage0.classList.contains('talking')) { const q = pending; pending = null; if (t - q.t < 9000) react(q.name); }
+    if (stage0.classList.contains('reacting') && (t > reactEnd || (stage0.classList.contains('talking') && $('#vReact').currentTime > 2.2))) stage0.classList.remove('reacting');
+    /* Tutors with real talking footage: the whole talking video (face, mouth, expression all filmed together) is shown
+       exactly while her voice sounds, and the quiet idle loop the rest of the time. Nothing is drawn on top. */
+    if (talkClips.length) {
+      const tk = stage0.classList.contains('talking'), lvl = tk || (!player.paused && !(L && L.conv)) ? rms() : 0, lv2 = $('#vLive');
+      peak = Math.max(lvl, peak * 0.9992, 0.02);
+      if (lvl > peak * 0.08) lastVoice = t;
+      const on = t - lastVoice < 260 && lastVoice > 0 && !stage0.classList.contains('reacting');
+      if (on !== voiced) {
+        voiced = on; stage0.classList.toggle('voiced', on);
+        if (on) { lv2.playbackRate = 0.6 + 0.4 * (S.set.lipSpeed || 0.6); lv2.play().catch(() => {}); } else setTimeout(() => { if (!voiced) lv2.pause(); }, 220);
+      }
+      // a new sentence after a real silence starts on the next clip, for variety
+      if (!on && lastVoice && t - lastVoice > 1500 && talkClips.length > 1 && !lv2._swapped) { lv2._swapped = true; talkAt = (talkAt + 1) % talkClips.length; lv2.src = talkClips[talkAt]; lv2.load(); }
+      if (on) lv2._swapped = false;
+      return;
+    }
+    if (!M || !base.complete || !mouth.complete) return;
+    const dt = Math.min(100, lastT ? t - lastT : 16); lastT = t;
+    const [v, c] = listen(t);
+    const heard = !api.fake && visemes(dt);
+    if (av3d.on()) {                      // 3D avatar is showing: nothing to draw here
+      if (!heard) { peak = Math.max(v, peak * 0.9985, 0.03); const o = Math.min(1, Math.max(0, (v / peak - 0.14) / 0.72)); open += (o - open) * 0.3; av3d.set('viseme_aa', open * 0.55); }
+      return;
+    }
+    /* How wide the mouth opens follows the loudness of the voice at this instant: it opens with each syllable and
+       closes as soon as she is silent. The speed is capped so the jaw moves like a jaw, not like a meter. */
+    const talking = stage0.classList.contains('talking');
+    let now = api.fake ? v : (talking || (!player.paused && !(L && L.conv)) ? rms() : 0);
+    // optional delay, for phones whose speaker plays a little after the signal is measured (set in the settings)
+    const lag = S.set.lipDelay || 0;
+    if (lag) { line.push([t, now]); while (line.length > 2 && line[1][0] <= t - lag) line.shift(); now = line[0][0] <= t - lag ? line[0][1] : 0; } else line.length = 0;
+    const k = S.set.lipSpeed || 0.6;                             // 1 = lively, 0.4 = very calm (set in the settings)
+    env = Math.max(now, env - dt * peak * k / 130);              // hold through the dips inside a syllable
+    peak = Math.max(now, peak * 0.9992, 0.02);
+    let target = env < peak * 0.07 ? 0 : Math.pow(Math.min(1, (env / peak - 0.07) / 0.6), 0.85);
+    if (!talking && L && L.conv) target = 0;
+    const step = target - open;
+    if (Math.abs(step) > 0.06) open += Math.max(-dt * k / 210, Math.min(dt * k / 150, step));   // at speed 1: 150 ms to open fully, 210 ms to close
+    // lip shape (rounded, neutral, stretched) comes from the recognised sound, and changes gently
+    if (heard) shapeTo = vShape;
+    else if (open > 0.18 && !wasOpen) shapeTo = Math.random() * 2;
+    wasOpen = open > 0.18;
+    shape += (shapeTo - shape) * 0.08 * k;
+
+    /* The idle loop keeps playing underneath: it gives the breathing, the blinks and the head movement. Only the
+       lower face (cheeks, nose, mouth, jaw) is drawn here, and it rides on the head using the loop's face track. */
+    g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.clearRect(0, 0, CW, CH);
+    // while she talks, the body-language loop plays (nods, eyebrows, hands); otherwise the quiet idle loop
+    const lv = $('#vLive');
+    if (live && talking !== wasTalking) { if (talking) lv.play().catch(() => {}); else setTimeout(() => { if (!$('#stage').classList.contains('talking')) lv.pause(); }, 400); }
+    wasTalking = talking;
+    const useLive = live && talking && !lv.paused && lv.readyState >= 2;
+    const tr = useLive ? live.track : track, when = useLive ? (liveTime >= 0 ? liveTime : lv.currentTime) : (vfTime >= 0 ? vfTime : $('#vIdle').currentTime);
+    if (tr) { const q = tr[Math.max(0, Math.min(tr.length - 1, Math.round(when * (useLive ? live.fps : fps))))]; g.setTransform(q[0], q[1], -q[1], q[0], q[2], q[3]); }
+    const f = open * (M.n - 1) * 0.7, k0 = Math.floor(f), k1 = Math.min(M.n - 1, k0 + 1), a = f - k0;
+    const r0 = Math.min(M.rows - 1, Math.floor(shape)), r1 = Math.min(M.rows - 1, r0 + 1), rb = shape - r0;
+    row(r0, k0, k1, a, g, M.x, M.y);
+    if (rb > 0.03 && r1 !== r0) { tg.clearRect(0, 0, M.w, M.h); row(r1, k0, k1, a, tg, 0, 0); g.globalAlpha = rb; g.drawImage(tmp, M.x, M.y); g.globalAlpha = 1; }
+    g.setTransform(1, 0, 0, 1, 0, 0);
+  }
+  function start() { if (!raf) { nextBlink = performance.now() + 1500; raf = requestAnimationFrame(frame); } }
+  function stop() { cancelAnimationFrame(raf); raf = 0; open = 0; try { $('#vLive').pause(); } catch {} }
+  return api;
+})();
+
+/* ---------- speech in ---------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, listening = false, micLang = 'target';
+function stopListening() { if (rec && listening) { try { rec.stop(); } catch {} } }
+function paintMic() {
+  const hasText = $('#txt').value.trim().length > 0, b = $('#micBtn');
+  b.classList.toggle('live', listening);
+  b.innerHTML = listening ? ICON.stop : (hasText || !SR) ? ICON.send : ICON.mic;
+  b.setAttribute('aria-label', listening ? 'Arrêter' : hasText ? 'Envoyer' : 'Parler');
+  $('#langBtn').textContent = C()[micLang].code.toUpperCase();
+}
+function startListening() {
+  if (!SR) return toast('Micro non disponible dans ce navigateur. Écris ta réponse.');
+  stopSpeaking();
+  rec = new SR();
+  rec.lang = C()[micLang].voice[0];
+  rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
+  let finalText = '';
+  rec.onstart = () => { listening = true; $('#status').textContent = 'Je t\'écoute'; paintMic(); };
+  rec.onresult = e => {
+    let t = '';
+    for (const r of e.results) { t += r[0].transcript; if (r.isFinal) finalText = t; }
+    $('#txt').value = t;
+  };
+  rec.onerror = e => { if (e.error === 'not-allowed' || e.error === 'service-not-allowed') toast('Autorise le micro pour parler.'); };
+  rec.onend = () => {
+    listening = false; $('#status').textContent = 'À l\'écoute'; paintMic();
+    const t = (finalText || $('#txt').value).trim();
+    if (t) submit(t);
+  };
+  try { rec.start(); } catch {}
+}
+$('#micBtn').addEventListener('click', () => {
+  if (listening) return stopListening();
+  const t = $('#txt').value.trim();
+  if (t) return submit(t);
+  if (L && L.conv) return;
+  startListening();
+});
+$('#txt').addEventListener('input', paintMic);
+$('#txt').addEventListener('keydown', e => { if (e.key === 'Enter') { const t = e.target.value.trim(); if (t) submit(t); } });
+$('#langBtn').addEventListener('click', () => { micLang = micLang === 'target' ? 'native' : 'target'; paintMic(); toast(`Micro en ${C()[micLang].name}`); });
+
+/* ---------- lesson ---------- */
+let L = null;
+const chat = $('#chat');
+const scrollDown = () => requestAnimationFrame(() => chat.scrollTop = chat.scrollHeight);
+function add(html, cls) { const d = document.createElement('div'); d.className = cls; d.innerHTML = html; chat.appendChild(d); scrollDown(); return d; }
+
+function openLesson(d, trial) {
+  setTimeout(() => simli.warm(), 0);   // connect the live face while the learner reads the lesson card
+  const info = dayInfo(d);
+  L = { info, history: [], turns: 0, mode: 'ai', step: 0, expect: null, complete: false, learned: [], busy: false, started: false, conv: null, log: [], fixes: [], t0: 0, reported: false, trial: !!trial, limit: trial ? 120 : 0 };
+  loadSDK();
+  micLang = 'target';
+  chat.innerHTML = ''; $('#sugg').innerHTML = ''; $('#txt').value = '';
+  $('#composer').hidden = true; $('#endBtn').hidden = true; $('#lesson').classList.remove('call'); camOff();
+  $('#dayPill').textContent = `Jour ${d} · ${info.level}`;
+  $('#tutorName').textContent = AV().name; $('#timer').textContent = ''; $('#helpBtn').hidden = true; $('#cctl').hidden = true; $('#lost').hidden = true; $('#subs').innerHTML = ''; $('#lesson').classList.remove('audio'); $('#orb').querySelector('b').textContent = AV().name[0];
+  show('lesson');
+  face.use(AV()); face.start(); av3d.show();
+  add(`<h3>${esc(info.title)}</h3><p class="sub">${esc(info.focus)}. ${esc(info.scenario)}</p>
+    ${info.phrases.map((p, i) => `<button class="ph" data-say="${i}"><div><b>${esc(p.target)}</b><span>${esc(p.native)}</span></div>${ICON.spk}</button>`).join('')}
+    <button class="btn block" id="startBtn" style="margin-top:14px">Appeler ${esc(AV().name)}</button>
+    <div class="rowsw"><div><b>Mode audio seul</b><span>Sans avatar, pour pratiquer en marchant.</span></div><button class="sw ${S.set.audioOnly ? 'on' : ''}" id="audioSw" aria-label="Mode audio seul"></button></div>`, 'card');
+  paintMic();
+}
+function closeLesson() { simli.stop(); if (L && L.conv) { const c = L.conv; L.conv = null; c.endSession().catch(() => {}); } clearInterval(tick); releaseWake(); camOff(); stopSpeaking(); stopListening(); $('#vIdle').pause(); face.stop(); av3d.hide(); L = null; show('home'); }
+$('#backBtn').addEventListener('click', closeLesson);
+$('#endBtn').addEventListener('click', () => finish());
+
+chat.addEventListener('click', e => {
+  if (!L) return;
+  const say = e.target.closest('[data-say]');
+  if (say) { unlockAudio(); return speak([{ lang: 'target', text: L.info.phrases[+say.dataset.say].target }]); }
+  if (e.target.closest('#againBtn')) return openLesson(L.info.n);
+  if (e.target.closest('#textBtn')) { e.target.closest('.card').remove(); return textMode(); }
+  const sw = e.target.closest('#audioSw'); if (sw) { S.set.audioOnly = !S.set.audioOnly; save(); return sw.classList.toggle('on', S.set.audioOnly); }
+  const pc = e.target.closest('.pc'); if (pc) return speak([{ lang: 'target', text: pc.dataset.t }]);
+  const tap = e.target.closest('.msg.her.tap'); if (tap) return translate(tap);
+  if (e.target.closest('#startBtn')) { e.target.closest('#startBtn').remove(); return begin(); }
+  if (e.target.closest('#doneBtn')) return finish();
+  const slow = e.target.closest('[data-slow]'), seg = e.target.closest('[data-t]');
+  if (seg) { const tr = seg.querySelector('.tr'); if (tr) tr.classList.remove('hid'); speak([{ lang: 'target', text: seg.dataset.t }], !!slow); }
+});
+$('#sugg').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || !L || L.busy) return;
+  $('#txt').value = b.dataset.t; paintMic();
+  speak([{ lang: 'target', text: b.dataset.t }]);
+});
+
+/* ----- live voice call ----- */
+let sdk = null, tick = null, wake = null;
+function loadSDK() {
+  return sdk || (sdk = new Promise(res => {
+    if (window.ElevenLabsClient) return res(true);
+    const el = document.createElement('script'); el.src = '/vendor/elevenlabs-client.js';
+    el.onload = () => res(!!window.ElevenLabsClient); el.onerror = () => { sdk = null; res(false); };
+    document.head.appendChild(el);
+  }));
+}
+/* Live lip sync (Simli): the tutor's voice is streamed to Simli, which sends back a video of their face saying
+   exactly those words, together with the audio in sync. It starts in the background once the call is up and takes
+   over between two sentences. If anything fails, the call simply continues with the tutor's own talking videos. */
+// Silences or restores the tutor's direct voice. iPhones ignore the volume of an audio element, so the elements are muted too.
+function directVoice(conv, on) {
+  try { conv.setVolume({ volume: on ? 1 : 0 }); } catch {}
+  for (const a of document.body.children) if (a.tagName === 'AUDIO' && !a.id) a.muted = !on;
+}
+const simli = {
+  cl: null, on: false, lib: null,
+  load() { return this.lib || (this.lib = new Promise(res => { const el = document.createElement('script'); el.src = '/vendor/simli-client.js';
+    el.onload = () => res(!!window.Simli); el.onerror = () => { this.lib = null; res(false); }; document.head.appendChild(el); })); },
+  // Starts connecting ahead of the call (it takes several seconds), or returns the connection already under way.
+  warm() { if (!L || L.conv) return Promise.resolve(false); if (this.pending && this.for === L) return this.pending; if (this.cl) this.stop(); this.for = L; return this.pending = this.prepare(L); },
+  // Opens the Simli session. Called while the call is still connecting, so the live face is ready for the first sentence.
+  async prepare(mine) {
+    const id = new URLSearchParams(location.search).get('simli') || AV().simli;
+    if (!id || S.set.audioOnly || this.cl) return false;
+    try {
+      const [ok, r] = await Promise.all([this.load(), fetch('/api/simli', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ faceId: id }) })]);
+      if (!ok || !r.ok) { const why = ok ? ((await r.json().catch(() => ({}))).error || r.status) : 'script'; console.warn('simli unavailable', why); toast('Visage en direct indisponible : ' + String(why).slice(0, 80)); return false; }
+      const { token } = await r.json();
+      if (L !== mine) return false;
+      const cl = this.cl = new Simli.SimliClient(token, $('#vSimli'), $('#aSimli'), null, Simli.LogLevel.ERROR);
+      const quit = () => { if (this.cl === cl) this.stop(L && L.conv); };
+      cl.on('stop', quit); cl.on('error', quit); cl.on('warning', m => console.warn('simli', m));
+      await Promise.race([cl.start(), new Promise((_, no) => setTimeout(() => no('timeout'), 15000))]);
+      if (L !== mine || this.cl !== cl) { if (this.cl === cl) this.stop(); return false; }
+      // Simli frames the tutor tighter than their own videos: pull the camera back so the switch to live is not a jump cut
+      try { cl.setCamera({ zoom: S.set.liveZoom || 0.7 }); } catch (e) { console.warn('simli camera', e); }
+      return this.ready = true;
+    } catch (e) { console.warn('simli', e); toast('Visage en direct indisponible : ' + String(e && e.message || e).slice(0, 80)); this.stop(); return false; }
+  },
+  // Routes the tutor's voice through Simli. wait: hold on for a gap between two sentences, so the voice does not jump mid-word.
+  async attach(conv, mine, wait) {
+    try {
+      const an = conv.output && conv.output.getAnalyser && conv.output.getAnalyser(); if (!an || !this.ready || this.on) return;
+      const cl = this.cl;
+      for (let n = 0; wait && n < 150 && L === mine && L.conv === conv && L.state === 'speaking'; n++) await new Promise(r => setTimeout(r, 120));
+      if (L !== mine || L.conv !== conv || this.cl !== cl || !cl) return;
+      this.dest = an.context.createMediaStreamDestination(); this.an = an; an.connect(this.dest);
+      cl.listenToMediastreamTrack(this.dest.stream.getAudioTracks()[0]);
+      directVoice(conv, false); $('#aSimli').muted = !!L.quiet; $('#aSimli').play().catch(() => {});
+      this.on = true; $('#stage').classList.add('simli'); $('#liveTag').hidden = false;
+    } catch (e) { console.warn('simli', e); this.stop(conv); }
+  },
+  stop(conv) {
+    const cl = this.cl; this.cl = null; this.pending = null;
+    if (this.on && conv && L && L.conv === conv) directVoice(conv, !L.quiet);
+    this.on = this.ready = false; $('#stage').classList.remove('simli'); $('#liveTag').hidden = true;
+    try { if (this.an && this.dest) this.an.disconnect(this.dest); } catch {} this.an = this.dest = null;
+    if (cl) { try { Promise.resolve(cl.stop()).catch(() => {}); } catch {} }
+  },
+};
+const releaseWake = () => { if (wake) { wake.release().catch(() => {}); wake = null; } };
+const balance = d => d <= 15 ? 'Speak mostly French, like a friend who happens to be a teacher. Every turn contains one or two short Dutch phrases for the learner to hear and say. Go slowly.'
+  : d <= 30 ? 'About half French, half Dutch. Small talk and questions in simple Dutch, explanations and help in French.'
+  : d <= 45 ? 'Mostly Dutch, in short sentences. Use French only for a quick explanation or when the learner is stuck.'
+  : d <= 60 ? 'Dutch only, simple and clear. Switch to French for one sentence only if the learner is truly lost.'
+  : 'Dutch only, at natural speed, with natural everyday phrasing. French only if the learner explicitly asks for it.';
+const greeting = (d, t) => greetFirst(d, t) || (d <= 15 ? `Hallo ! C'est ${AV().name}. ${AV().gender === 'M' ? 'Content' : 'Contente'} de te retrouver. Aujourd'hui, on voit ensemble: ${t.toLowerCase()}. Ça te va ?`
+  : d <= 30 ? 'Hallo! Hoe gaat het? Tu as passé une bonne journée ?'
+  : d <= 60 ? 'Hoi! Leuk je weer te zien. Hoe gaat het met je vandaag?'
+  : 'Hé, hallo! Hoe is het? Vertel, wat heb je vandaag gedaan?');
+// very first call with this learner: the tutor introduces themself, and uses the learner's name when known
+function greetFirst(d, t) {
+  if (doneCount() || (L && !L.trial && d !== startDay())) return '';
+  const a = AV(), n = S.profile && S.profile.name, m = a.gender === 'M';
+  return `Hallo${n ? ' ' + n : ''} ! Moi c'est ${a.name}, ${m ? 'ton' : 'ta'} prof de néerlandais. ${m ? 'Ravi' : 'Ravie'} de te rencontrer ! ${n ? 'Tu es prêt pour ton premier appel ?' : 'Dis-moi, comment tu t\'appelles ?'}`;
+}
+// what the tutor knows about the learner, from the questionnaire
+function learnerText() {
+  const p = S.profile, o = OB();
+  if (!p || p.done !== true) return 'A French speaker learning Dutch. Nothing else is known yet: ask their first name and why they are learning.';
+  const goal = o.goals.find(g => g.id === p.goal), places = (o.places[p.goal] || []).filter(x => (p.places || []).includes(x[0])).map(x => x[3]);
+  const skills = o.skills.filter(x => (p.skills || []).includes(x[0])).map(x => x[3]);
+  return [
+    `First name: ${p.name}. ${p.gender === 'f' ? 'She is a woman: use feminine agreement in French.' : p.gender === 'm' ? 'He is a man: use masculine agreement in French.' : 'Gender not given: avoid gendered agreement in French.'}`,
+    goal ? `Why they learn Dutch: ${goal.en}.` : '',
+    places.length ? `Where they want to use it: ${places.join(', ')}. Take your examples and role plays from these situations.` : '',
+    p.variant === 'be' ? 'They want Belgian Dutch (Flemish): use the vocabulary, expressions and politeness habits of Flanders, and mention it when the Netherlands says it differently.' : 'They want the Dutch of the Netherlands.',
+    `Level from a vocabulary check: ${o.levelsEn[p.level || 0]}.`,
+    skills.length ? `What they want to improve most: ${skills.join(', ')}.` : '',
+    (p.interests || []).length ? `Topics they enjoy, for small talk and examples: ${o.interests.filter(x => p.interests.includes(x[0])).map(x => x[3]).join(', ')}.` : '',
+    p.correct === 'all' ? 'Correction: they asked to be corrected on everything. Correct each mistake briefly, right away, then move on.'
+      : p.correct === 'key' ? 'Correction: they asked for important mistakes only. Let small slips go and keep the conversation flowing.'
+      : 'Correction: correct as you go, by rephrasing naturally, without breaking the flow.',
+    `They plan about ${p.minutes || 10} minutes a day: start wrapping up around that time.`,
+  ].filter(Boolean).join('\n');
+}
+
+// reactions go to the 3D model, or to a clip for video tutors
+const VCLIP = { wave: 'wave', thumbs_up: 'thumbs_up', ok: 'thumbs_up', proud: 'thumbs_up', laugh: 'laugh' };
+function reactTo(name, dur) { if (AV().video) { if (VCLIP[name]) face.react(VCLIP[name]); } else av3d.react(name, dur); }
+// state shown under the tutor's name: listening, thinking or speaking
+function setState(st) {
+  const stage = $('#stage');
+  stage.classList.toggle('talking', st === 'speaking'); stage.classList.toggle('thinking', st === 'thinking'); stage.classList.toggle('listening', st === 'listening');
+  $('#status').textContent = { speaking: 'Parle', thinking: 'Réfléchit', listening: 'T\'écoute', connecting: 'Appel en cours', online: 'En ligne', ended: 'Appel terminé', lost: 'Connexion perdue' }[st] || '';
+  if (L) L.state = st;
+}
+/* subtitles: last thing each side said, plus cards for phrases and corrections */
+function sub(html, cls, ttl) {
+  const box = $('#subs'), d = document.createElement('div'); d.className = cls; d.innerHTML = html;
+  if (cls.startsWith('line')) box.querySelectorAll('.' + cls.split(' ').join('.')).forEach(e => e.remove());
+  box.appendChild(d);
+  while (box.children.length > 3) box.firstChild.remove();
+  if (ttl) setTimeout(() => d.remove(), ttl);
+  return d;
+}
+async function subTutor(text) {
+  if (!S.set.subs) return;
+  const d = sub(esc(text), 'line her');
+  if (S.set.subs < 2) return;
+  try {
+    const r = await fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ translate: text, targetName: C().target.name, nativeName: C().native.name }) });
+    if (r.ok && d.isConnected) { const t = (await r.json()).translation; if (t && norm(t) !== norm(text)) { const sm = document.createElement('small'); sm.textContent = t; d.appendChild(sm); } }
+  } catch {}
+}
+
+async function startCall(resume) { try { return await startCall0(resume); } catch (e) { simli.stop(); throw e; } }
+async function startCall0(resume) {
+  const mine = L, i = L.info, av = AV();
+  setState('connecting');
+  const live = simli.warm();
+  const [ok, r] = await Promise.all([loadSDK(), fetch('/api/session', { method: 'POST' })]);
+  if (!ok || !r.ok) throw new Error('unavailable');
+  const { token, signedUrl } = await r.json();
+  const opts = {
+    dynamicVariables: { day: String(i.n), level: i.level, lesson_title: i.title, focus: i.focus, scenario: i.scenario,
+      phrases: i.phrases.map(p => `- ${p.target} = ${p.native}`).join('\n'), balance: balance(i.n),
+      greeting: resume ? 'Ah, te revoilà ! On a été coupés. On reprend où on en était ?' : greeting(i.n, i.title),
+      tutor_name: av.name, persona: av.persona, learner: learnerText(),
+      recap: resume && L.log.length ? '# Earlier in this call (the line dropped, you are picking up where you left off)\n' + L.log.slice(-8).map(m => `${m.role === 'user' ? 'Learner' : 'You'}: ${m.text}`).join('\n') : '',
+      ...(L.trial ? { lesson_title: 'Premier appel de découverte', scenario: 'A first call of about two minutes. Get to know the learner in a few words, then teach one or two useful phrases linked to their goal. When about two minutes have passed, wrap up warmly and say you look forward to the next call.' } : {}) },
+    overrides: { tts: { voiceId: tutorVoice() } },
+    clientTools: {
+      show_phrase: ({ dutch, french }) => { if (L !== mine || !dutch) return; learn({ target: dutch, native: french || '' });
+        add(`${ICON.spk}<div><b>${esc(dutch)}</b><span>${esc(french)}</span></div>`, 'pc').dataset.t = dutch;
+        sub(`<b>${esc(dutch)}</b><span>${esc(french)}</span>`, 'tcard', 9000); },
+      show_correction: ({ said, correct, why }) => { if (L !== mine || !correct) return; L.fixes.push({ said, correct, why });
+        add(`<h4>Petite correction</h4><s>${esc(said)}</s><div class="good">${esc(correct)}</div><p>${esc(why)}</p>`, 'fix');
+        sub(`<h4>Petite correction</h4><s>${esc(said)}</s><b>${esc(correct)}</b><span>${esc(why)}</span>`, 'tcard fixc', 11000); reactTo('thinking', 2); },
+      lesson_done: ({ praise }) => { if (L === mine) { L.complete = true; L.praise = praise || ''; reactTo('thumbs_up', 3); } },
+      react: ({ reaction }) => { if (L === mine) reactTo(reaction); },
+    },
+    onMessage: m => {
+      if (L !== mine || !m || !m.message) return;
+      m = { ...m, message: m.message.replace(/\[[^\]\n]{1,24}\]\s*/g, '').trim() };
+      if (!m.message || /^[.\s…]+$/.test(m.message)) return;
+      const me = m.source === 'user' || m.role === 'user';
+      L.log.push({ role: me ? 'user' : 'tutor', text: m.message });
+      if (me) { L.turns++; add(esc(m.message), 'msg me'); if (S.set.subs) sub(esc(m.message), 'line me', 5000);
+        if (L.state !== 'speaking') { setState('thinking'); if (Math.random() < 0.45) reactTo('nod', 2); } }
+      else { add(`<div>${esc(m.message)}</div><div class="hint">Touche pour traduire</div>`, 'msg her tap').dataset.x = m.message; subTutor(m.message); }
+    },
+    onModeChange: ({ mode }) => {
+      if (L !== mine) return;
+      const talking = mode === 'speaking';
+      if (talking) setState('speaking'); else if (L.state !== 'thinking') { setState('listening'); av3d.look(); }
+      if (!talking && L.complete) setTimeout(() => { if (L === mine && L.conv) endCall(); }, 1500);
+    },
+    onDisconnect: d => {
+      if (L !== mine || !L.conv) return;         // we hung up ourselves
+      L.conv = null; clearInterval(tick); simli.stop();
+      if (d && d.reason === 'error' || !navigator.onLine) { setState('lost'); $('#lost').hidden = false; }
+      else afterCall();
+    },
+    onError: () => {},
+  };
+  const C2 = window.ElevenLabsClient.Conversation;
+  // give the live face up to 8 s to be ready, so the tutor is lip-synced from the very first word
+  await Promise.race([live, new Promise(r => setTimeout(r, 10000))]);
+  if (L !== mine) { simli.stop(); return; }
+  let conv;
+  try { if (!token) throw new Error('no token'); conv = await C2.startSession({ conversationToken: token, connectionType: 'webrtc', ...opts }); }
+  catch (e) { if (!signedUrl || (e && e.name === 'NotAllowedError')) throw e; conv = await C2.startSession({ signedUrl, connectionType: 'websocket', ...opts }); }
+  if (L !== mine) { conv.endSession().catch(() => {}); return; }
+  L.conv = conv; L.mode = 'call'; L.muted = false; L.quiet = false;
+  if (!resume) L.t0 = Date.now();
+  try { face.attach(conv.output && conv.output.getAnalyser && conv.output.getAnalyser()); } catch {}
+  if (simli.ready) simli.attach(conv, mine); else live.then(ok => { if (ok) simli.attach(conv, mine, true); });
+  const audio = S.set.audioOnly;
+  $('#lesson').classList.add('call'); $('#lesson').classList.toggle('audio', audio);
+  $('#cctl').hidden = false; $('#helpBtn').hidden = false; $('#lost').hidden = true; setState('online'); paintCall();
+  if (audio) av3d.hide(); else { av3d.view(true); if (AV().video) face.react('wave'); else setTimeout(() => av3d.react('wave', 2.5), 500); }
+  clearInterval(tick);
+  tick = setInterval(() => {
+    const t = Math.floor((Date.now() - mine.t0) / 1000); $('#timer').textContent = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+    if (mine.limit && t >= mine.limit && mine.conv) endCall();
+  }, 1000);
+  if (audio) { const orb = $('#orb'); const beat = () => { if (L !== mine || !mine.conv) return; let v = 0; try { v = mine.conv.getOutputVolume() || 0; } catch {} orb.style.setProperty('--v', Math.min(1, v * 2.2).toFixed(2)); requestAnimationFrame(beat); }; beat(); }
+  try { wake = await navigator.wakeLock?.request('screen'); } catch {}
+}
+function learn(p) { if (p.target && !L.learned.some(x => x.target === p.target)) L.learned.push(p); }
+function paintCall() {
+  const m = $('#muteBtn'); m.innerHTML = L && L.muted ? ICON.micOff : ICON.mic; m.classList.toggle('off', !!(L && L.muted));
+  const c = $('#camBtn'); c.innerHTML = cam ? ICON.cam : ICON.camOff; c.classList.toggle('on', !!cam);
+  const k = $('#spkBtn'); k.innerHTML = L && L.quiet ? ICON.spkOff : ICON.spk; k.classList.toggle('off', !!(L && L.quiet));
+  const cc = $('#ccBtn'); cc.textContent = S.set.subs === 2 ? 'CC FR' : 'CC'; cc.classList.toggle('on', S.set.subs > 0);
+  $('#hangBtn').innerHTML = ICON.hang;
+}
+/* camera preview: local only, never sent or recorded */
+let cam = null;
+async function camOn() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return toast('Caméra non disponible sur cet appareil.');
+  try {
+    cam = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 480 } }, audio: false });
+    const v = $('#pip'); v.srcObject = cam; v.hidden = false; v.play().catch(() => {});
+  } catch (e) {
+    cam = null;
+    toast(e && e.name === 'NotAllowedError' ? 'Caméra refusée. Autorise-la dans les réglages du navigateur.' : 'Impossible d\'ouvrir la caméra.');
+  }
+  paintCall();
+}
+function camOff() { if (cam) { cam.getTracks().forEach(t => t.stop()); cam = null; } const v = $('#pip'); v.srcObject = null; v.hidden = true; v.style.left = v.style.top = ''; v.style.right = ''; }
+(() => { // drag the preview, then snap to the nearest side
+  const v = $('#pip'); let ox = 0, oy = 0, drag = false;
+  v.addEventListener('pointerdown', e => { drag = true; const r = v.getBoundingClientRect(); ox = e.clientX - r.left; oy = e.clientY - r.top; v.setPointerCapture(e.pointerId); });
+  v.addEventListener('pointermove', e => { if (!drag) return; const s = $('#stage').getBoundingClientRect();
+    v.style.right = 'auto'; v.style.left = Math.max(8, Math.min(s.width - v.offsetWidth - 8, e.clientX - s.left - ox)) + 'px';
+    v.style.top = Math.max(8, Math.min(s.height - v.offsetHeight - 110, e.clientY - s.top - oy)) + 'px'; });
+  const drop = () => { if (!drag) return; drag = false; const s = $('#stage').getBoundingClientRect(), r = v.getBoundingClientRect();
+    v.style.transition = 'left .2s'; v.style.left = (r.left + r.width / 2 - s.left < s.width / 2 ? 12 : s.width - r.width - 12) + 'px'; setTimeout(() => v.style.transition = '', 220); };
+  v.addEventListener('pointerup', drop); v.addEventListener('pointercancel', drop);
+})();
+async function endCall() {
+  if (!L || !L.conv) return;
+  const c = L.conv; L.conv = null; simli.stop();
+  try { await c.endSession(); } catch {}
+  afterCall();
+}
+async function afterCall() {
+  if (!L || L.reported) return;
+  L.reported = true; const mine = L, i = L.info; simli.stop();
+  clearInterval(tick); releaseWake();
+  $('#cctl').hidden = true; $('#helpBtn').hidden = true; $('#lost').hidden = true; $('#composer').hidden = true; $('#lesson').classList.remove('call', 'audio');
+  camOff(); $('#subs').innerHTML = ''; setState('ended'); $('#timer').textContent = '';
+  if (S.set.audioOnly) av3d.show(); else av3d.view(false);
+  const said = L.log.filter(m => m.role === 'user').length;
+  const secs = Math.max(1, Math.round((Date.now() - L.t0) / 1000)), dur = `${Math.floor(secs / 60)} min ${String(secs % 60).padStart(2, '0')} s`;
+  if (said < 2) return add(`<h3>Appel terminé</h3><p class="sub">Durée ${dur}. L'appel a été trop court pour faire un bilan.</p><button class="btn block" id="againBtn">Rappeler ${esc(AV().name)}</button>`, 'card');
+  const card = add(`<h3>Appel terminé</h3><p class="sub">Durée ${dur}. ${esc(AV().name)} prépare ton bilan…</p><div class="typing"><i></i><i></i><i></i></div>`, 'card rep');
+  let rep = null;
+  try {
+    const r = await fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+      day: i.n, level: i.level, title: i.title, targetName: C().target.name, nativeName: C().native.name, transcript: L.log }) });
+    if (r.ok) rep = await r.json();
+  } catch {}
+  if (L !== mine) return;
+  if (!rep) rep = { summary: L.praise || 'Bel appel.', takeaways: L.learned.slice(0, 3).map(p => `${p.target} = ${p.native}`), corrections: L.fixes, phrases: [], score: null };
+  for (const p of rep.phrases || []) learn(p);
+  const keep = (rep.takeaways || []).slice(0, 3), fixes = (rep.corrections || []).slice(0, 3);
+  card.innerHTML = `<div style="display:flex;align-items:flex-end;gap:12px;justify-content:space-between"><div><h3>Appel terminé</h3><p class="sub" style="margin:0">Durée ${dur} · ${said} prises de parole</p></div>${rep.score != null ? `<div class="score">${Math.round(rep.score)}</div>` : ''}</div>
+    <p style="margin:12px 0 0">${esc(rep.summary)}</p>
+    <h4>3 points à retenir</h4>${keep.length ? `<ul>${keep.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '<p style="margin:0;color:var(--muted)">Rien de nouveau cette fois.</p>'}
+    <h4>3 corrections principales</h4>${fixes.length ? fixes.map(f => `<div class="fx"><s>${esc(f.said)}</s><b>${esc(f.correct)}</b><span>${esc(f.why)}</span></div>`).join('') : '<p style="margin:0;color:var(--muted)">Aucune faute importante. Bravo.</p>'}
+    <button class="btn block teal" id="doneBtn" style="margin-top:16px">Valider le jour ${i.n}</button>
+    <button class="btn block ghost" id="againBtn" style="margin-top:8px">Refaire l'appel</button>`;
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+async function translate(el) {
+  if (el.querySelector('.tr')) return el.querySelector('.tr').remove();
+  const h = el.querySelector('.hint'); if (h) h.textContent = 'Traduction…';
+  let t = '';
+  try {
+    const r = await fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ translate: el.dataset.x, targetName: C().target.name, nativeName: C().native.name }) });
+    if (r.ok) t = (await r.json()).translation;
+  } catch {}
+  if (h) h.remove();
+  if (!t) return toast('Traduction indisponible');
+  const d = document.createElement('div'); d.className = 'tr'; d.textContent = t; el.appendChild(d); scrollDown();
+}
+$('#muteBtn').addEventListener('click', () => { if (!L || !L.conv) return; L.muted = !L.muted; try { L.conv.setMicMuted(L.muted); } catch {} paintCall(); toast(L.muted ? 'Micro coupé' : 'Micro activé'); });
+$('#camBtn').addEventListener('click', async () => { if (cam) { camOff(); paintCall(); } else await camOn(); });
+$('#spkBtn').addEventListener('click', () => { if (!L || !L.conv) return; L.quiet = !L.quiet; try { if (simli.on) $('#aSimli').muted = L.quiet; else directVoice(L.conv, !L.quiet); } catch {} paintCall(); toast(L.quiet ? 'Son coupé' : 'Son activé'); });
+$('#ccBtn').addEventListener('click', () => { S.set.subs = (S.set.subs + 1) % 3; save(); paintCall(); if (!S.set.subs) $('#subs').querySelectorAll('.line').forEach(e => e.remove());
+  toast(['Sous-titres désactivés', 'Sous-titres activés', 'Sous-titres avec traduction'][S.set.subs]); });
+$('#hangBtn').addEventListener('click', endCall);
+$('#helpBtn').addEventListener('click', () => { if (L && L.conv) { try { L.conv.sendUserMessage('Je suis bloqué. Aide-moi: donne-moi la phrase à dire, lentement, avec sa traduction.'); } catch {} toast(`${AV().name} va t'aider`); } });
+$('#resumeBtn').addEventListener('click', async () => {
+  if (!L) return; const mine = L; $('#lost').hidden = true;
+  try { await startCall(true); } catch { if (L === mine) { $('#lost').hidden = false; toast('Toujours pas de connexion. Réessaie dans un instant.'); } }
+});
+$('#stopBtn').addEventListener('click', () => { $('#lost').hidden = true; afterCall(); });
+window.addEventListener('offline', () => { if (L && L.conv) toast('Connexion instable…'); });
+
+function textMode() { if (!L) return; L.mode = 'ai'; L.started = true; $('#composer').hidden = false; turn('[START]', true); }
+async function begin() {
+  const mine = L;
+  L.started = true; unlockAudio();
+  add('Appel en cours…', 'note').id = 'ringing';
+  try { await startCall(); document.getElementById('ringing')?.remove(); return; }
+  catch (e) {
+    if (L !== mine) return;
+    document.getElementById('ringing')?.remove(); setState('ended');
+    const denied = e && (e.name === 'NotAllowedError' || /permission|denied/i.test(e.message || ''));
+    if (denied) return add(`<h3>Micro refusé</h3><p class="sub">${esc(AV().name)} a besoin de ton micro pour t'entendre. Autorise-le dans les réglages du navigateur pour ce site, puis réessaie.</p>
+      <button class="btn block" id="againBtn">Réessayer</button><button class="btn block ghost" id="textBtn" style="margin-top:8px">Continuer par écrit</button>`, 'card');
+    add(navigator.onLine ? 'Appel vocal indisponible pour le moment. Voici le mode texte.' : 'Pas de connexion internet. Vérifie ton réseau puis réessaie.', 'note');
+    if (!navigator.onLine) return add(`<button class="btn block" id="againBtn">Réessayer</button>`, 'card');
+  }
+  textMode();
+}
+function submit(text) {
+  if (L && L.conv) { $('#txt').value = ''; paintMic(); L.log.push({ role: 'user', text }); L.turns++; add(esc(text), 'msg me'); try { L.conv.sendUserMessage(text); } catch {} return; }
+  if (!L || !L.started || L.busy || L.complete) return;
+  stopSpeaking();
+  $('#txt').value = ''; paintMic();
+  add(esc(text), 'msg me');
+  L.turns++;
+  if (L.turns >= 6) $('#endBtn').hidden = false;
+  turn(text);
+}
+
+async function turn(text, isStart) {
+  L.busy = true; $('#sugg').innerHTML = '';
+  $('#stage').classList.add('thinking'); $('#status').textContent = 'Réfléchit';
+  const dots = add('<div class="typing"><i></i><i></i><i></i></div>', 'msg her');
+  L.history.push({ role: 'user', content: text });
+  const mine = L;
+  let r = null;
+  if (L.mode === 'ai') {
+    try { r = await askTutor(); }
+    catch (e) {
+      if (isStart || e.fatal) { L.mode = 'script'; add('Mode entraînement guidé. La conversation libre s\'active quand la clé du tuteur est configurée.', 'note'); }
+      else { dots.remove(); L.history.pop(); L.busy = false; $('#stage').classList.remove('thinking'); $('#status').textContent = 'À l\'écoute'; return toast('Connexion perdue. Réessaie.'); }
+    }
+  }
+  if (L !== mine) return;
+  if (!r) { await new Promise(z => setTimeout(z, 450)); r = scriptReply(text, isStart); }
+  dots.remove();
+  $('#stage').classList.remove('thinking');
+  if (L !== mine) return;
+  render(r);
+  L.history.push({ role: 'assistant', content: r.segments.map(s => s.text).join(' ') });
+  L.busy = false;
+  await speak(r.segments.map(s => ({ lang: s.lang, text: s.text })));
+}
+
+async function askTutor() {
+  const c = C(), i = L.info;
+  let res;
+  try {
+    res = await fetch('/api/tutor', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+      day: i.n, tutor: c.tutor, targetName: c.target.name, nativeName: c.native.name, level: i.level,
+      title: i.title, focus: i.focus, scenario: i.scenario, phrases: i.phrases, history: L.history }) });
+  } catch { throw Object.assign(new Error('offline'), { fatal: false }); }
+  if (!res.ok) throw Object.assign(new Error('tutor'), { fatal: res.status === 503 || res.status === 404 || res.status === 405 });
+  const d = await res.json();
+  if (!d || !Array.isArray(d.segments) || !d.segments.length) throw new Error('bad');
+  return d;
+}
+
+/* guided mode, used when the AI tutor is not reachable */
+const norm = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+function sim(a, b) {
+  a = norm(a); b = norm(b); if (!a || !b) return 0; if (a === b) return 1;
+  const m = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) m[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++)
+    m[i][j] = Math.min(m[i - 1][j] + 1, m[i][j - 1] + 1, m[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return 1 - m[a.length][b.length] / Math.max(a.length, b.length);
+}
+function scriptReply(text, isStart) {
+  const p = L.info.phrases, n = p.length, segs = [];
+  const r = { segments: segs, correction: { needed: false, original: '', corrected: '', explanation: '' }, suggestions: [], new_phrases: [], lesson_complete: false };
+  if (isStart) segs.push({ lang: 'native', text: `Bonjour, je suis ${AV().name}. Aujourd'hui: ${L.info.title.toLowerCase()}. ${L.info.scenario}`, translation: '' });
+  else if (L.expect) {
+    if (sim(text, L.expect.target) >= 0.72) segs.push({ lang: 'native', text: ['Très bien !', 'Parfait !', 'Oui, c\'est ça !', 'Bravo !'][L.step % 4], translation: '' });
+    else { r.correction = { needed: true, original: text, corrected: L.expect.target, explanation: `En français: ${L.expect.native}` }; segs.push({ lang: 'native', text: 'Presque. Écoute encore une fois.', translation: '' }, { lang: 'target', text: L.expect.target, translation: L.expect.native }); }
+  }
+  const k = L.step++;
+  if (k < n) { // listen and repeat
+    L.expect = p[k];
+    segs.push({ lang: 'native', text: k ? 'Répète:' : 'Répète après moi:', translation: '' }, { lang: 'target', text: p[k].target, translation: p[k].native });
+    r.new_phrases.push(p[k]);
+  } else if (k < 2 * n) { // translate back, in a different order
+    const q = p[(k - n + 1) % n]; L.expect = q;
+    segs.push({ lang: 'native', text: `Maintenant sans aide. Comment dis-tu: ${q.native}`, translation: '' });
+  } else {
+    L.expect = null; r.lesson_complete = true;
+    segs.push({ lang: 'native', text: 'Tu connais les phrases du jour.', translation: '' }, { lang: 'target', text: 'Goed gedaan! Tot morgen!', translation: 'Bien joué ! À demain !' });
+  }
+  if (L.expect) r.suggestions = [L.expect];
+  return r;
+}
+
+function render(r) {
+  const c = r.correction;
+  if (c && c.needed && c.corrected) add(`<h4>Petite correction</h4><s>${esc(c.original)}</s>
+    <div class="good" data-t="${esc(c.corrected)}">${esc(c.corrected)}</div><p>${esc(c.explanation)}</p>`, 'fix');
+  add(r.segments.map(s => s.lang === 'target'
+    ? `<div class="seg t" data-t="${esc(s.text)}"><div class="tx">${esc(s.text)}</div>${s.translation ? `<div class="tr${S.set.showTr ? '' : ' hid'}">${esc(s.translation)}</div>` : ''}
+       <div class="act"><span class="chip">${ICON.spk}Écouter</span><span class="chip" data-slow="1">Lent</span></div></div>`
+    : `<div class="seg">${esc(s.text)}</div>`).join(''), 'msg her');
+  for (const p of r.new_phrases || []) if (p.target && !L.learned.some(x => x.target === p.target)) L.learned.push(p);
+  $('#sugg').innerHTML = (r.suggestions || []).slice(0, 3).map(s => `<button data-t="${esc(s.target)}"><b>${esc(s.target)}</b><span>${esc(s.native)}</span></button>`).join('');
+  if (r.lesson_complete && !L.complete) {
+    L.complete = true; $('#sugg').innerHTML = ''; $('#composer').hidden = true;
+    add(`<h3>Leçon terminée</h3><p class="sub">Jour ${L.info.n} validé. Tes phrases sont ajoutées à tes révisions.</p><button class="btn block teal" id="doneBtn">Valider le jour ${L.info.n}</button>`, 'card');
+  }
+}
+
+function finish() {
+  if (!L) return;
+  const d = L.info.n, first = !S.done[d];
+  S.done[d] = true;
+  const t = today();
+  if (S.last !== t) {
+    const y = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
+    S.streak = S.last === y ? S.streak + 1 : 1; S.last = t;
+  }
+  for (const p of [...L.info.phrases, ...L.learned])
+    if (p.target && p.native && !S.cards.some(c => c.t === p.target)) S.cards.push({ t: p.target, n: p.native, box: 0, due: Date.now() });
+  save();
+  closeLesson();
+  toast(first ? (d === 90 ? 'Programme terminé. Gefeliciteerd!' : `Jour ${d} validé. Goed gedaan!`) : 'Révision enregistrée');
+}
+
+/* ---------- review ---------- */
+const GAP = [0, 1, 2, 4, 8, 16, 30];
+let R = null;
+function renderReview() {
+  const due = S.cards.filter(c => c.due <= Date.now());
+  $('#dueTag').textContent = `${due.length} à revoir`;
+  const body = $('#reviewBody');
+  if (!S.cards.length) return body.innerHTML = `<div class="empty"><p>Termine ta première leçon pour remplir tes révisions.</p></div>`;
+  if (!due.length && !R) return body.innerHTML = `<div class="empty"><p>Tout est à jour. ${S.cards.length} phrases mémorisées.</p><button class="btn ghost" id="allBtn">M'entraîner quand même</button></div>`;
+  if (!R || !R.q.length) R = { q: (due.length ? due : S.cards).slice().sort(() => Math.random() - .5).slice(0, 20), open: false };
+  const c = R.q[0];
+  body.innerHTML = `<div class="flash"><div class="q">${esc(c.n)}</div>
+    ${R.open ? `<div class="a">${esc(c.t)}</div>` : `<div style="color:var(--muted)">Dis-le en ${esc(C().target.name)}, puis vérifie.</div>`}</div>
+    ${R.open ? `<div class="row"><button class="btn ghost" data-r="0">À revoir</button><button class="btn teal" data-r="1">Je sais</button></div>
+      <div class="row"><button class="btn ghost" data-r="say">Réécouter</button></div>`
+    : `<div class="row"><button class="btn" data-r="open">Voir la réponse</button></div>`}
+    <p class="overall" style="justify-content:center">${R.q.length} carte${R.q.length > 1 ? 's' : ''} restante${R.q.length > 1 ? 's' : ''}</p>`;
+}
+$('#reviewBody').addEventListener('click', e => {
+  if (e.target.closest('#allBtn')) { R = { q: S.cards.slice().sort(() => Math.random() - .5).slice(0, 20), open: false }; return renderReview(); }
+  const b = e.target.closest('[data-r]'); if (!b || !R) return;
+  const c = R.q[0], a = b.dataset.r;
+  unlockAudio();
+  if (a === 'open') { R.open = true; speak([{ lang: 'target', text: c.t }]); }
+  else if (a === 'say') speak([{ lang: 'target', text: c.t }]);
+  else {
+    if (a === '1') { c.box = Math.min(c.box + 1, GAP.length - 1); c.due = Date.now() + GAP[c.box] * 864e5; R.q.shift(); }
+    else { c.box = 0; c.due = Date.now(); R.q.push(R.q.shift()); }
+    R.open = false; save();
+    if (!R.q.length) { R = null; toast('Révision terminée'); }
+  }
+  renderReview();
+});
+
+/* ---------- settings ---------- */
+function renderSettings() {
+  const s = S.set, c = C();
+  $('#settingsBody').innerHTML = `<div class="card">
+    <div class="set"><div><b>Mon prof</b><span>${esc(AV().name)}, ${esc(AV().trait.toLowerCase())}. Touche un visage pour changer.</span>
+      <div class="pick" id="pickTutor">${window.AVATARS.map(a => `<button data-av="${a.id}" class="${a.id === AV().id ? 'sel' : ''}"><img src="${a.thumb}" alt="">${esc(a.name)}</button>`).join('')}</div></div></div>
+    <div class="set"><div><b>Mon profil</b><span>${S.profile && S.profile.done === true ? `${esc(S.profile.name)} · ${esc(OB().levels[S.profile.level || 0])} · ${S.profile.variant === 'be' ? 'Belgique' : 'Pays-Bas'} · ${S.profile.minutes || 10} min par jour` : 'Questionnaire pas encore rempli.'}</span></div><button class="btn ghost" id="editProfile">Modifier</button></div>
+    <div class="set"><div><b>Cours</b><span>${esc(c.target.name)} depuis le ${esc(c.native.name)}. D'autres langues arrivent.</span></div></div>
+    <div class="set"><div><b>Vitesse de la voix</b><span>Ralentis au début, accélère ensuite.</span></div><input type="range" id="rate" min="0.6" max="1.1" step="0.05" value="${s.rate}"></div>
+    <div class="set"><div><b>Afficher les traductions</b><span>Désactive pour deviner avant de toucher la phrase.</span></div><button class="sw ${s.showTr ? 'on' : ''}" data-k="showTr" aria-label="Traductions"></button></div>
+    <div class="set"><div><b>Débloquer tous les jours</b><span>Pour choisir librement dans le programme.</span></div><button class="sw ${s.unlockAll ? 'on' : ''}" data-k="unlockAll" aria-label="Débloquer"></button></div>
+    <div class="set"><div><b>Cadrage en direct</b><span>Vers la gauche, on voit le prof de plus loin. S'applique au prochain appel.</span></div><input type="range" id="liveZoom" min="0.5" max="1.2" step="0.05" value="${s.liveZoom || 0.7}"></div>
+<div class="set"><div><b>Vitesse des lèvres</b><span>Vers la gauche, le prof parle avec des gestes plus lents.</span></div><input type="range" id="lipSpeed" min="0.3" max="1" step="0.05" value="${s.lipSpeed || 0.6}"></div>
+    <div class="set"><div><b>Retard des lèvres</b><span>Si la bouche bouge avant le son sur ton téléphone, augmente un peu. Actuel : ${s.lipDelay || 0} ms.</span></div><input type="range" id="lipDelay" min="0" max="300" step="20" value="${s.lipDelay || 0}"></div>
+    <div class="set"><div><b>Tester la voix</b><span>La voix de ${esc(c.tutor)}, en ${esc(c.target.name)} puis en ${esc(c.native.name)}.</span></div><button class="btn ghost" id="testVoice">Écouter</button></div>
+  </div>
+  <button class="btn ghost block" id="reset" style="margin-top:16px;color:#b42318">Remettre ma progression à zéro</button>`;
+}
+$('#settingsBody').addEventListener('click', e => {
+  const sw = e.target.closest('.sw');
+  if (sw) { S.set[sw.dataset.k] = !S.set[sw.dataset.k]; save(); return renderSettings(); }
+  if (e.target.closest('#testVoice')) unlockAudio();
+  if (e.target.closest('#testVoice')) return speak([{ lang: 'target', text: C().days[0][3][2][0] }, { lang: 'native', text: C().days[0][3][2][1] }]);
+  const pk = e.target.closest('[data-av]'); if (pk) { S.set.avatar = pk.dataset.av; save(); unlockAudio(); player.src = AV().sample; player.play().catch(() => {}); return renderSettings(); }
+  if (e.target.closest('#editProfile')) return startOnb(true);
+  if (e.target.closest('#reset') && confirm('Effacer toute ta progression ?')) { S = structuredClone(DEF); save(); R = null; startOnb(); toast('Progression effacée'); }
+});
+$('#settingsBody').addEventListener('change', e => { if (e.target.id === 'rate') { S.set.rate = +e.target.value; save(); } if (e.target.id === 'lipSpeed') { S.set.lipSpeed = +e.target.value; save(); } if (e.target.id === 'liveZoom') { S.set.liveZoom = +e.target.value; save(); } if (e.target.id === 'lipDelay') { S.set.lipDelay = +e.target.value; save(); renderSettings(); } });
+
+/* ---------- onboarding questionnaire ---------- */
+const OB = () => window.ONBOARDING[S.pair] || window.ONBOARDING['nl-fr'];
+const STEPS = ['name', 'goal', 'places', 'info1', 'variant', 'skills', 'interests', 'words', 'info2', 'correct', 'style', 'match', 'ready'];
+let ob = null;
+function startOnb(edit) {
+  S.profile = S.profile || {};
+  ob = { i: edit ? 0 : Math.min(STEPS.length - 1, S.profile.step || 0), stage: 'a', picking: false, edit: !!edit, known: new Set() };
+  show('onb');
+}
+function obGo(d) {
+  ob.i = Math.max(0, Math.min(STEPS.length - 1, ob.i + d)); ob.picking = false;
+  S.profile.step = ob.i; save();                      // so the learner can leave and come back
+  renderOnb(); $('#obBody').scrollTop = 0;
+}
+const optRow = (id, em, t, sub, sel) => `<button class="opt ${sel ? 'sel' : ''}" data-o="${esc(id)}"><span class="em">${em}</span><span>${esc(t)}${sub ? `<small>${esc(sub)}</small>` : ''}</span></button>`;
+const tagsOf = a => `<div class="tags">${a.tags.map(x => `<span>${esc(x)}</span>`).join('')}<span>${a.age} ans</span></div>`;
+function obLevel() {
+  const o = OB(), p = S.profile, ka = [...ob.known].filter(w => o.words.a.includes(w)).length, kb = [...ob.known].filter(w => o.words.b.includes(w)).length;
+  p.level = ka === 0 ? 0 : ka < 8 ? 1 : ka < 18 ? 2 : kb < 8 ? 3 : 4;
+}
+function renderOnb() {
+  if (!ob) return;
+  const o = OB(), p = S.profile, step = STEPS[ob.i], body = $('#obBody'), foot = $('#obFoot');
+  const seg = 6, pos = ob.i / (STEPS.length - 1) * seg;
+  $('#obBar').innerHTML = Array.from({ length: seg }, (_, k) => `<i class="${pos >= k + 1 ? 'full' : ''}"><b style="transform:scaleX(${Math.max(0, Math.min(1, pos - k))})"></b></i>`).join('');
+  $('#obBack').style.visibility = ob.i > 0 || ob.picking ? 'visible' : 'hidden';
+  $('#obSkip').style.visibility = step === 'ready' ? 'hidden' : 'visible';
+  const next = (label, ok) => `<button class="btn" id="obNext" ${ok === false ? 'disabled' : ''}>${label || 'Continuer'}</button>`;
+  foot.innerHTML = '';
+  if (step === 'name') {
+    body.innerHTML = `<h1>Comment tu t'appelles ?</h1><p class="lead">Ton prof t'appellera par ton prénom.</p>
+      <input class="obin" id="obName" placeholder="Ton prénom" maxlength="24" autocomplete="given-name" value="${esc(p.name || '')}">
+      <p class="lead" style="margin-bottom:10px">Pour bien accorder ses phrases en français :</p>
+      <div class="opts">${optRow('m', '👨', 'Homme', '', p.gender === 'm')}${optRow('f', '👩', 'Femme', '', p.gender === 'f')}${optRow('x', '🤔', 'Je préfère ne pas le dire', '', p.gender === 'x')}</div>`;
+    foot.innerHTML = next('Continuer', !!(p.name && p.gender));
+  } else if (step === 'goal') {
+    body.innerHTML = `<h1>Pourquoi veux-tu apprendre le ${esc(C().target.name)} ?</h1><p class="lead"></p><div class="opts">${o.goals.map(g => optRow(g.id, g.e, g.t, '', p.goal === g.id)).join('')}</div>`;
+  } else if (step === 'places') {
+    body.innerHTML = `<h1>Où vas-tu t'en servir ?</h1><p class="lead">Choisis tout ce qui te concerne.</p><div class="opts">${(o.places[p.goal] || o.places.fun).map(x => optRow(x[0], x[1], x[2], '', (p.places || []).includes(x[0]))).join('')}</div>`;
+    foot.innerHTML = next('Continuer', (p.places || []).length > 0);
+  } else if (step === 'info1') {
+    const list = (o.places[p.goal] || []).filter(x => (p.places || []).includes(x[0])).map(x => x[2].toLowerCase());
+    body.innerHTML = `<h1>Compris${p.name ? ', ' + esc(p.name) : ''} !</h1><p class="lead"></p><div class="obinfo"><p>On construit tes conversations autour de ce qui compte pour toi : <b>${esc(list.slice(0, 3).join(', '))}</b>.</p>
+      <p style="margin-top:12px">Bonne nouvelle : le ${esc(C().target.name)} partage beaucoup de mots avec le français et l'anglais. Pour un francophone, le plus délicat est l'ordre des mots et le son « g ». On les travaille dès le début, à l'oral.</p></div>`;
+    foot.innerHTML = next();
+  } else if (step === 'variant') {
+    body.innerHTML = `<h1>Quel ${esc(C().target.name)} veux-tu parler ?</h1><p class="lead">Le vocabulaire et l'accent de ton prof s'adaptent.</p><div class="opts">${o.variants.map(v => optRow(v.id, v.e, v.t, v.s, p.variant === v.id)).join('')}</div>`;
+  } else if (step === 'skills') {
+    body.innerHTML = `<h1>Que veux-tu améliorer en priorité ?</h1><p class="lead">Choisis une ou plusieurs réponses.</p><div class="opts">${o.skills.map(x => optRow(x[0], x[1], x[2], '', (p.skills || []).includes(x[0]))).join('')}</div>`;
+    foot.innerHTML = next('Continuer', (p.skills || []).length > 0);
+  } else if (step === 'interests') {
+    body.innerHTML = `<h1>De quoi aimes-tu parler ?</h1><p class="lead">Ton prof choisira ses sujets de conversation là-dedans.</p><div class="chips">${o.interests.map(x => `<button class="wchip ${(p.interests || []).includes(x[0]) ? 'sel' : ''}" data-int="${x[0]}">${x[1]} ${esc(x[2])}</button>`).join('')}</div>`;
+    foot.innerHTML = next('Continuer', (p.interests || []).length > 0);
+  } else if (step === 'words') {
+    const list = o.words[ob.stage], all = list.every(w => ob.known.has(w));
+    body.innerHTML = `<h1>Touche les mots que tu connais</h1><p class="lead">${ob.stage === 'a' ? 'Niveau débutant. Pas de piège : ça sert à régler ton point de départ.' : 'Tu en connais beaucoup. Et ceux-ci, plus difficiles ?'}</p>
+      <div class="chips">${list.map(w => `<button class="wchip ${ob.known.has(w) ? 'sel' : ''}" data-w="${esc(w)}">${esc(w)}</button>`).join('')}</div>`;
+    foot.innerHTML = `<label><input type="checkbox" id="obAll" ${all ? 'checked' : ''}> Je les connais tous</label>` + next(ob.known.size && [...ob.known].some(w => list.includes(w)) ? 'Continuer' : 'Je n\'en connais aucun');
+  } else if (step === 'info2') {
+    const lv = p.level || 0, how = lv <= 1 ? 'Ton prof t\'expliquera en français et introduira le néerlandais petit à petit.' : lv === 2 ? 'Ton prof alternera français et néerlandais simple.' : 'Ton prof te parlera presque uniquement en néerlandais.';
+    body.innerHTML = `<h1>Un programme à ton niveau</h1><p class="lead"></p><div class="obinfo"><p>Ton point de départ : <b>${esc(o.levels[lv])}</b>.</p><p style="margin-top:10px">${how}</p>
+      <div class="faces">${window.AVATARS.map(a => `<img src="${a.thumb}" alt="">`).join('')}</div><p style="font-size:14px;color:var(--muted)">Encore deux questions pour trouver ton prof.</p></div>`;
+    foot.innerHTML = next();
+  } else if (step === 'correct') {
+    body.innerHTML = `<h1>À quel point veux-tu qu'on te corrige ?</h1><p class="lead"></p><div class="opts">${optRow('key', '🎯', 'Seulement les fautes importantes', 'Pour parler sans s\'arrêter', p.correct === 'key')}${optRow('flow', '🌊', 'Au fur et à mesure', 'Ton prof reformule en douceur', p.correct === 'flow')}${optRow('all', '🔍', 'Corrige tout', 'Chaque faute, tout de suite', p.correct === 'all')}</div>`;
+  } else if (step === 'style') {
+    const st = [['warm', '👋', 'Sympa et chaleureux'], ['calm', '🍃', 'Calme et doux'], ['cool', '😎', 'Cool et moderne'], ['fun', '🤪', 'Enjoué et amusant'], ['classic', '🎓', 'Classique et méthodique']];
+    body.innerHTML = `<h1>Quel style de prof te plairait le plus ?</h1><p class="lead"></p><div class="opts">${st.map(x => optRow(x[0], x[1], x[2], '', p.style === x[0])).join('')}</div>`;
+  } else if (step === 'match') {
+    if (ob.picking) {
+      body.innerHTML = `<h1>Choisis ton prof</h1><p class="lead">Tu pourras en changer à tout moment.</p><div class="opts" style="max-width:400px">${window.AVATARS.map(a => `<div class="trow ${a.id === AV().id ? 'sel' : ''}" data-pick="${a.id}"><img src="${a.thumb}" alt=""><div style="flex:1;min-width:0"><b>${esc(a.name)}</b><small>${esc(a.bio)}</small>${tagsOf(a)}</div><button class="play" data-play="${a.id}">${ICON.spk}</button></div>`).join('')}</div>`;
+      foot.innerHTML = next(`Continuer avec ${esc(AV().name)}`);
+    } else {
+      const a = AV();
+      body.innerHTML = `<h1>On a trouvé ton prof</h1><p class="lead">D'après tes réponses, ${esc(a.name)} te correspond le mieux.</p>
+        <div class="tcardb"><img src="${a.thumb}" alt="${esc(a.name)}"><div class="inf"><div style="display:flex;justify-content:space-between;align-items:center"><h3>${esc(a.name)}</h3><button class="play" data-play="${a.id}">${ICON.spk} Écouter</button></div><p>${esc(a.bio)}</p>${tagsOf(a)}</div></div>`;
+      foot.innerHTML = next(`Continuer avec ${esc(a.name)}`) + `<button class="btn ghost" id="obOther">Choisir un autre prof</button>`;
+    }
+  } else if (step === 'ready') {
+    const goal = o.goals.find(g => g.id === p.goal), a = AV(); p.minutes = p.minutes || 10;
+    body.innerHTML = `<h1>Ton programme est prêt${p.name ? ', ' + esc(p.name) : ''}</h1><p class="lead">Voici ce qu'on a préparé pour toi.</p>
+      <div class="sum"><div><span>Objectif</span><b>${esc(goal ? goal.t : '')}</b></div><div><span>${esc(C().target.name[0].toUpperCase() + C().target.name.slice(1))}</span><b>${p.variant === 'be' ? 'Belgique' : 'Pays-Bas'}</b></div>
+        <div><span>Point de départ</span><b>${esc(o.levels[p.level || 0])}, jour ${o.startDay[p.level || 0]}</b></div><div><span>Corrections</span><b>${{ key: 'Fautes importantes', all: 'Tout corriger' }[p.correct] || 'Au fur et à mesure'}</b></div>
+        <div><span>Ton prof</span><b>${esc(a.name)}</b></div></div>
+      <p class="lead" style="margin:18px 0 0">Combien de temps par jour ?</p>
+      <div class="mins">${[5, 10, 15, 20].map(m => `<button data-min="${m}" class="${p.minutes === m ? 'sel' : ''}">${m} min</button>`).join('')}</div>`;
+    foot.innerHTML = `<button class="btn" id="obTrial">Faire mon premier appel (2 min)</button><button class="btn ghost" id="obLater">Plus tard</button>`;
+  }
+}
+function obFinish(trial) {
+  const p = S.profile; p.done = true; p.step = 0;
+  S.start = OB().startDay[p.level || 0]; save(); ob = null;
+  if (trial) { openLesson(currentDay(), true); $('#startBtn')?.remove(); begin(); } else { show('home'); toast('Ton programme est prêt'); }
+}
+$('#obBack').addEventListener('click', () => { if (!ob) return; if (ob.picking) { ob.picking = false; return renderOnb(); } if (STEPS[ob.i] === 'words' && ob.stage === 'b') { ob.stage = 'a'; return renderOnb(); } obGo(-1); });
+$('#obSkip').addEventListener('click', () => { if (!ob) return; if (S.profile.done !== true) S.profile.done = 'skipped'; save(); ob = null; show('home'); });
+$('#onb').addEventListener('input', e => { if (e.target.id === 'obName') { S.profile.name = e.target.value.trim(); const b = $('#obNext'); if (b) b.disabled = !(S.profile.name && S.profile.gender); } });
+$('#onb').addEventListener('change', e => { if (e.target.id === 'obAll') { const list = OB().words[ob.stage]; for (const w of list) e.target.checked ? ob.known.add(w) : ob.known.delete(w); renderOnb(); } });
+$('#onb').addEventListener('click', e => {
+  if (!ob) return;
+  const p = S.profile, o = OB(), step = STEPS[ob.i];
+  const pl = e.target.closest('[data-play]');
+  if (pl) { e.stopPropagation(); const a = window.AVATARS.find(x => x.id === pl.dataset.play); unlockAudio(); stopSpeaking(); player.src = a.sample; return void player.play().catch(() => {}); }
+  const pk = e.target.closest('[data-pick]'); if (pk) { S.set.avatar = pk.dataset.pick; save(); return renderOnb(); }
+  const it = e.target.closest('[data-int]'); if (it) { const a = new Set(p.interests || []); a.has(it.dataset.int) ? a.delete(it.dataset.int) : a.add(it.dataset.int); p.interests = [...a]; save(); return renderOnb(); }
+  const w = e.target.closest('[data-w]'); if (w) { ob.known.has(w.dataset.w) ? ob.known.delete(w.dataset.w) : ob.known.add(w.dataset.w); return renderOnb(); }
+  const mn = e.target.closest('[data-min]'); if (mn) { p.minutes = +mn.dataset.min; save(); return renderOnb(); }
+  if (e.target.closest('#obOther')) { ob.picking = true; return renderOnb(); }
+  if (e.target.closest('#obTrial')) return obFinish(true);
+  if (e.target.closest('#obLater')) return obFinish(false);
+  const opt = e.target.closest('[data-o]');
+  if (opt) {
+    const v = opt.dataset.o;
+    if (step === 'name') { p.gender = v; save(); return renderOnb(); }
+    if (step === 'places' || step === 'skills') { const k = step, a = new Set(p[k] || []); a.has(v) ? a.delete(v) : a.add(v); p[k] = [...a]; save(); return renderOnb(); }
+    if (step === 'goal') { if (p.goal !== v) p.places = []; p.goal = v; }
+    else if (step === 'variant') p.variant = v;
+    else if (step === 'correct') p.correct = v;
+    else if (step === 'style') { p.style = v; const a = window.AVATARS.find(x => x.style === v); if (a) S.set.avatar = a.id; }
+    save(); opt.classList.add('sel');
+    return void setTimeout(() => { if (ob && STEPS[ob.i] === step) obGo(1); }, 180);
+  }
+  if (e.target.closest('#obNext')) {
+    if (step === 'name' && !(p.name && p.gender)) return;
+    if (step === 'words') {
+      const a = o.words.a, ka = [...ob.known].filter(x => a.includes(x)).length;
+      if (ob.stage === 'a' && ka >= 18) { ob.stage = 'b'; renderOnb(); return void ($('#obBody').scrollTop = 0); }
+      obLevel();
+    }
+    obGo(1);
+  }
+});
+
+/* ---------- boot ---------- */
+if (!S.profile || !S.profile.done) startOnb(); else renderHome();
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('/sw.js').catch(() => {});
+window.__lingovia = { get S() { return S; }, get L() { return L; }, face, av3d };
+})();
+</script>
+</body>
+</html>

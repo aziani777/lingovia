@@ -5,7 +5,8 @@ Premier cours: néerlandais depuis le français.
 
 ## Ce qu'il y a dedans
 
-- `index.html` : l'app mobile (PWA installable), sans étape de build
+- `index.html` : le site vitrine (page d'accueil)
+- `app.html` : l'app mobile (PWA installable), servie sur `/app`, sans étape de build
 - `curriculum.js` : le programme de 90 jours. Ajouter une langue = ajouter une clé `"<cible>-<natif>"`
 - `api/session.js`, `api/speak.js` : appel vocal et voix (ElevenLabs)
 - `api/feedback.js` : bilan de fin d'appel et traduction (Claude)
