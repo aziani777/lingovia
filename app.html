@@ -457,7 +457,7 @@ const acct = {
 };
 acct.load();
 const PLAN_NAMES = { free: 'Découverte', essentiel: 'Essentiel', intensif: 'Intensif' };
-const AUTH_ERR = { invalid_credentials: 'Email ou mot de passe incorrect.', user_already_exists: 'Un compte existe déjà avec cet email. Connecte-toi.', weak_password: 'Mot de passe trop court : 6 caractères au minimum.',
+const AUTH_ERR = { same_password: 'Choisis un mot de passe différent de l\'ancien.', invalid_credentials: 'Email ou mot de passe incorrect.', user_already_exists: 'Un compte existe déjà avec cet email. Connecte-toi.', weak_password: 'Mot de passe trop court : 6 caractères au minimum.',
   email_address_invalid: 'Cette adresse email ne semble pas valide.', over_email_send_rate_limit: 'Trop de tentatives. Réessaie dans quelques minutes.', confirm: 'Compte créé. Ouvre le mail de confirmation, puis connecte-toi.' };
 
 // The sheet that asks to sign in, or to pick an offer when the minutes are used up.
@@ -470,7 +470,16 @@ function gate(kind, why) {
       <form id="authForm" data-new="${isNew ? 1 : ''}"><input type="email" name="email" placeholder="Ton email" autocomplete="email" required>
       <input type="password" name="password" placeholder="Mot de passe (6 caractères min.)" autocomplete="${isNew ? 'new-password' : 'current-password'}" minlength="6" required>
       <div class="err" id="authErr"></div><button class="btn block">${isNew ? 'Créer mon compte' : 'Me connecter'}</button></form>
-      <button class="lnk" data-gate="${isNew ? 'login' : 'auth'}">${isNew ? 'J\'ai déjà un compte' : 'Créer un compte'}</button>`;
+      <button class="lnk" data-gate="${isNew ? 'login' : 'auth'}">${isNew ? 'J\'ai déjà un compte' : 'Créer un compte'}</button>
+      ${isNew ? '' : '<button class="lnk" data-gate="forgot" style="color:var(--muted);font-weight:600">Mot de passe oublié ?</button>'}`;
+  } else if (kind === 'forgot') {
+    b.innerHTML = `<h2>Mot de passe oublié</h2><p>Indique ton email. Tu recevras un lien pour choisir un nouveau mot de passe.</p>
+      <form id="authForm" data-mode="forgot"><input type="email" name="email" placeholder="Ton email" autocomplete="email" required>
+      <div class="err" id="authErr"></div><button class="btn block">Recevoir le lien</button></form><button class="lnk" data-gate="login">Retour</button>`;
+  } else if (kind === 'newpass') {
+    b.innerHTML = `<h2>Nouveau mot de passe</h2><p>Choisis ton nouveau mot de passe.</p>
+      <form id="authForm" data-mode="newpass"><input type="password" name="password" placeholder="Nouveau mot de passe (6 caractères min.)" autocomplete="new-password" minlength="6" required>
+      <div class="err" id="authErr"></div><button class="btn block">Enregistrer</button></form>`;
   } else {
     const pay = acct.info && acct.info.payment;
     b.innerHTML = `<h2>${why ? esc(why) : 'Choisis ton offre'}</h2><p>Sans engagement. Tu peux arrêter quand tu veux, en un clic.</p>
@@ -489,7 +498,15 @@ $('#gate').addEventListener('click', async e => {
 });
 $('#gate').addEventListener('submit', async e => {
   e.preventDefault(); const f = e.target, btn = f.querySelector('button'), d = new FormData(f); btn.disabled = true; $('#authErr').textContent = '';
-  try { await acct.sign(String(d.get('email')).trim(), String(d.get('password')), !!f.dataset.new); $('#gate').hidden = true; toast('Te voilà connecté'); show($('.view.on').id); }
+  try {
+    if (f.dataset.mode === 'forgot') { await acct.auth('recover?redirect_to=' + encodeURIComponent(location.origin + '/app'), { email: String(d.get('email')).trim() });
+      $('#gateBody').innerHTML = '<h2>Regarde tes mails</h2><p>Si un compte existe avec cet email, un lien vient de t\'être envoyé. Pense à vérifier les courriers indésirables.</p>'; return; }
+    if (f.dataset.mode === 'newpass') { const t = await acct.token();
+      const r = await fetch(`${CFG.supabaseUrl}/auth/v1/user`, { method: 'PUT', headers: { apikey: CFG.supabaseKey, Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: JSON.stringify({ password: String(d.get('password')) }) });
+      const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error_code || 'auth');
+      if (j.email) { acct.s.email = j.email; try { localStorage.setItem(AUTHKEY, JSON.stringify(acct.s)); } catch {} }
+      await acct.sync(false); $('#gate').hidden = true; toast('Mot de passe enregistré'); show($('.view.on').id); return; }
+    await acct.sign(String(d.get('email')).trim(), String(d.get('password')), !!f.dataset.new); $('#gate').hidden = true; toast('Te voilà connecté'); show($('.view.on').id); }
   catch (er) { $('#authErr').textContent = AUTH_ERR[er.message] || 'Connexion impossible. Vérifie tes informations et réessaie.'; if (er.message === 'confirm') gate('login', AUTH_ERR.confirm); }
   btn.disabled = false;
 });
@@ -1647,6 +1664,10 @@ $('#onb').addEventListener('click', e => {
 
 /* ---------- boot ---------- */
 if (!S.profile || !S.profile.done) startOnb(); else renderHome();
+// arriving from the "forgot password" email: the link carries a short session, used to set the new password
+{ const h = new URLSearchParams(location.hash.slice(1));
+  if (acct.on && h.get('type') === 'recovery' && h.get('access_token')) { acct.keep({ access_token: h.get('access_token'), refresh_token: h.get('refresh_token'), expires_in: +h.get('expires_in') || 3600 }); history.replaceState(null, '', '/app'); gate('newpass'); }
+  else if (acct.on && h.get('error_description')) { history.replaceState(null, '', '/app'); gate('forgot'); setTimeout(() => { const e = $('#authErr'); if (e) e.textContent = 'Ce lien a expiré. Demande-en un nouveau.'; }, 0); } }
 if (acct.on && acct.s) acct.refresh().then(() => { const q = new URLSearchParams(location.search).get('paid'); if (q === '1') toast('Merci ! Ton offre est active.'); if (q) history.replaceState(null, '', '/app'); });
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('/sw.js').catch(() => {});
 window.__lingovia = { get S() { return S; }, get L() { return L; }, face, av3d };
