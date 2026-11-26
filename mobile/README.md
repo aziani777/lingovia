@@ -1,6 +1,6 @@
 # Lingovia, applications Android et iOS
 
-Deux enveloppes natives (Capacitor) autour de l'appli web. Elles ouvrent `https://lingovia.ai/app`,
+Deux enveloppes natives (Capacitor) autour de l'appli web. Elles ouvrent `https://www.lingovia.ai/app`,
 donc toute mise à jour du site arrive dans les applis sans repasser par les magasins.
 
 Identifiant de l'appli : `ai.lingovia.app`

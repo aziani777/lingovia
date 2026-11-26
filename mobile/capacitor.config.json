@@ -4,8 +4,8 @@
   "webDir": "www",
   "backgroundColor": "#fbf7f1",
   "server": {
-    "url": "https://lingovia.ai/app",
-    "allowNavigation": ["lingovia.ai", "*.supabase.co", "checkout.stripe.com", "billing.stripe.com"]
+    "url": "https://www.lingovia.ai/app",
+    "allowNavigation": ["www.lingovia.ai", "lingovia.ai", "*.supabase.co", "checkout.stripe.com", "billing.stripe.com"]
   },
   "ios": { "contentInset": "always" },
   "android": { "allowMixedContent": false }
