@@ -16,9 +16,9 @@ const Outline = z.object({ themes: z.array(z.object({ emoji: z.string(), title: 
 const Lesson = z.object({ scenario: z.string(), intro: z.string(), phrases: z.array(z.object({ target: z.string(), native: z.string() })) });
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   if (!process.env.ANTHROPIC_API_KEY) return res.status(503).json({ error: 'no_key' });
-  const b = req.body || {}, native = LANG[b.native], target = LANG[b.target], level = LEVELS.includes(b.level) ? b.level : 'A0';
+  const b = (req.method === 'GET' ? req.query : req.body) || {}, native = LANG[b.native], target = LANG[b.target], level = LEVELS.includes(b.level) ? b.level : 'A0';
   if (!native || !target || native === target) return res.status(400).json({ error: 'bad_languages' });
   const who = `The learner speaks ${native} and is learning ${target}${b.variant === 'be' && b.target === 'nl' ? ' as spoken in Belgium (Flemish)' : ''}, current level ${level}.
 Goal: ${clip(b.goal, 120) || 'everyday conversation'}. Skills they want: ${clip(b.skills, 300) || 'speaking'}. Interests: ${clip(b.interests, 300) || 'not given'}.`;
