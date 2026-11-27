@@ -21,7 +21,8 @@ export default async function handler(req, res) {
   const b = (req.method === 'GET' ? req.query : req.body) || {}, native = LANG[b.native], target = LANG[b.target], level = LEVELS.includes(b.level) ? b.level : 'A0';
   if (!native || !target || native === target) return res.status(400).json({ error: 'bad_languages' });
   const who = `The learner speaks ${native} and is learning ${target}${b.variant === 'be' && b.target === 'nl' ? ' as spoken in Belgium (Flemish)' : ''}, current level ${level}.
-Goal: ${clip(b.goal, 120) || 'everyday conversation'}. Skills they want: ${clip(b.skills, 300) || 'speaking'}. Interests: ${clip(b.interests, 300) || 'not given'}.`;
+Goal: ${clip(b.goal, 120) || 'everyday conversation'}. Skills they want: ${clip(b.skills, 300) || 'speaking'}. Interests: ${clip(b.interests, 300) || 'not given'}.
+When you address the learner in ${native}, use the informal form ("tu" in French, "du" in German, "tú" in Spanish, "tu" in Italian, "je" in Dutch).`;
   const client = new Anthropic();
   const ask = async (system, user, schema, max) => {
     const r = await client.messages.create({ model: FAST, max_tokens: max, system, messages: [{ role: 'user', content: user }], output_config: { format: zodOutputFormat(schema) } });
