@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
 <title>Lingovia</title>
-<meta name="description" content="Apprends une langue en parlant avec ta prof. Programme de 90 jours.">
+<meta name="description" content="Apprends une langue en parlant avec ton prof, à ton niveau.">
 <meta name="theme-color" content="#fbf7f1">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -64,6 +64,14 @@ h1,h2,h3{margin:0;line-height:1.15;letter-spacing:-.01em}
 .day.done::after{content:"✓";position:absolute;right:5px;top:2px;font-size:10px}
 .day.cur{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 4px 14px rgba(242,107,29,.4)}
 .day.lock{opacity:.5}
+.les{display:grid;gap:8px;margin-top:10px}
+.lrow{display:flex;align-items:center;gap:12px;text-align:left;width:100%;padding:10px 12px;border-radius:14px;background:var(--bg);border:1.5px solid var(--line)}
+.lrow i{flex:none;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-weight:700;font-size:13px;background:var(--card);color:var(--muted);border:1.5px solid var(--line)}
+.lrow b{display:block;font-size:15px}.lrow small{display:block;color:var(--muted);font-size:13px}
+.lrow.done i{background:var(--teal-soft);color:var(--teal);border-color:transparent}
+.lrow.cur{border-color:var(--accent);background:var(--accent-soft)}.lrow.cur i{background:var(--accent);color:#fff;border-color:var(--accent)}
+.free{display:flex;align-items:center;gap:12px;width:100%;text-align:left;margin-top:14px;padding:14px 16px;border-radius:var(--r);background:var(--teal);color:#fff;box-shadow:var(--shadow)}
+.free .em{font-size:26px}.free b{display:block;font-size:16px}.free small{display:block;opacity:.85;font-size:13px}.free .go{margin-left:auto;font-size:26px;opacity:.8}
 
 /* tab bar */
 .tabs{display:flex;border-top:1px solid var(--line);background:var(--card);padding:6px 8px calc(6px + var(--safe-b))}
@@ -373,7 +381,7 @@ input[type=range]{width:120px;accent-color:var(--accent)}
 </div>
 
 <script src="/config.js"></script>
-<script src="/curriculum.js"></script>
+<script src="/langs.js"></script>
 <script src="/avatars.js"></script>
 <script src="/onboarding.js"></script>
 <script>
@@ -395,22 +403,63 @@ const ICON = {
 
 /* ---------- state ---------- */
 const KEY = 'lingovia.v1';
-const DEF = { pair: 'nl-fr', done: {}, streak: 0, last: '', cards: [], set: { rate: 0.85, showTr: true, unlockAll: false, three: true, avatar: 'sanne', subs: 1, audioOnly: false } };
+const DEF = { native: 'fr', target: 'nl', plans: {}, streak: 0, last: '', cards: [], set: { rate: 0.85, showTr: true, three: true, avatar: 'sanne', subs: 1, audioOnly: false } };
 let S;
 try { S = Object.assign({}, DEF, JSON.parse(localStorage.getItem(KEY) || '{}')); S.set = Object.assign({}, DEF.set, S.set); }
 catch { S = structuredClone(DEF); }
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} if (typeof acct !== 'undefined') acct.queue(); };
-const C = () => window.COURSES[S.pair] || window.COURSES['nl-fr'];
+const LANGS = window.LANGS, LEVELS = window.LEVELS;
+// The current course: the language being learned and the learner's own language (names are given in the learner's language).
+const C = () => { const t = LANGS[S.target] || LANGS.nl, n = LANGS[S.native] || LANGS.fr;
+  return { target: { code: t.code, name: t.names[n.code], en: t.en, voice: [t.speech], flag: t.flag }, native: { code: n.code, name: n.names[n.code], en: n.en, voice: [n.speech], flag: n.flag }, tutor: AV().name }; };
 const AV = () => window.AVATARS.find(a => a.id === S.set.avatar) || window.AVATARS[0];
-const tutorVoice = () => (S.profile && S.profile.variant === 'be' && AV().voiceBE) || AV().voice;
+const tutorVoice = () => (S.profile && S.profile.variant === 'be' && S.target === 'nl' && AV().voiceBE) || (AV().voices && AV().voices[S.target]) || AV().voice;
 const today = () => new Date().toISOString().slice(0, 10);
-const doneCount = () => Object.keys(S.done).length;
-const startDay = () => S.start || 1;
-const currentDay = () => { for (let d = startDay(); d <= 90; d++) if (!S.done[d]) return d; return 90; };
-const unlocked = d => S.set.unlockAll || d <= startDay() || S.done[d - 1] || S.done[d];
-const phaseOf = d => C().phases.find(p => d >= p.from && d <= p.to);
-const dayInfo = d => { const r = C().days[d - 1]; return { n: d, title: r[0], focus: r[1], scenario: r[2], phrases: r[3].map(p => ({ target: p[0], native: p[1] })), level: phaseOf(d).level }; };
-
+/* ---------- study plan ----------
+   No fixed calendar any more: each learner has a plan for their level, made of themes, each with a few lessons.
+   The outline is written for them when they finish the questionnaire; a lesson's details are written when they open it. */
+const levelIdx = () => Math.max(0, Math.min(LEVELS.length - 1, (S.profile && S.profile.level) || 0));
+const PLAN = () => (S.plans || {})[S.target] || null;
+const lessonsOf = pl => pl.themes.flatMap((t, ti) => t.lessons.map((l, li) => ({ t, l, ti, li })));
+const doneCount = () => { const pl = PLAN(); return pl ? lessonsOf(pl).filter(x => x.l.done).length : 0; };
+const nextLesson = () => { const pl = PLAN(); return pl ? lessonsOf(pl).find(x => !x.l.done) || null : null; };
+function lessonInfo(ti, li) {
+  const pl = PLAN(), t = pl.themes[ti], l = t.lessons[li];
+  return { n: lessonsOf(pl).findIndex(x => x.ti === ti && x.li === li) + 1, ti, li, theme: t.title, title: l.title, focus: l.focus, intro: l.intro || '',
+    scenario: l.scenario || `Play a short real-life scene about "${l.title}" (${l.focus}), within the theme "${t.title}".`, phrases: l.phrases || [], level: pl.level };
+}
+const freeInfo = () => ({ free: true, n: 0, title: 'Conversation libre', focus: 'Parle de ce que tu veux', intro: '', phrases: [], level: (PLAN() || {}).level || LEVELS[levelIdx()],
+  scenario: 'Free conversation: no lesson today. Chat about whatever the learner wants (their day, their interests, their plans), at their level, and teach useful phrases as they come up.' });
+const planBody = extra => { const p = S.profile || {}, o = OB(), pick = (list, ids) => list.filter(x => (ids || []).includes(x[0])).map(x => x[3]).join(', ');
+  const goal = (o.goals.find(g => g.id === p.goal) || {}).en;
+  return JSON.stringify({ native: S.native, target: S.target, level: LEVELS[levelIdx()], variant: p.variant, goal: [goal, pick(o.places[p.goal] || [], p.places)].filter(Boolean).join(': '),
+    skills: pick(o.skills, p.skills), interests: pick(o.interests, p.interests), ...extra }); };
+let planBusy = null;
+function makePlan(avoid, past) {
+  return planBusy || (planBusy = (async () => {
+    try {
+      const r = await fetch('/api/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: planBody({ do: 'outline', avoid: avoid || '' }) });
+      if (!r.ok) throw new Error('plan');
+      const d = await r.json();
+      S.plans = S.plans || {};
+      S.plans[S.target] = { level: LEVELS[levelIdx()], made: Date.now(), past: past || 0,
+        themes: d.themes.map(t => ({ emoji: t.emoji, title: t.title, lessons: t.lessons.map(l => ({ title: l.title, focus: l.focus })) })) };
+      save();
+    } finally { planBusy = null; }
+  })());
+}
+// Opens a lesson of the plan, writing its details first if this is the first time.
+async function openAt(ti, li, trial) {
+  const pl = PLAN(), l = pl && pl.themes[ti] && pl.themes[ti].lessons[li]; if (!l) return;
+  if (!l.phrases) {
+    toast('Préparation de la leçon…');
+    try {
+      const r = await fetch('/api/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: planBody({ do: 'lesson', theme: pl.themes[ti].title, title: l.title, focus: l.focus }) });
+      if (r.ok) { const d = await r.json(); l.scenario = d.scenario; l.intro = d.intro; l.phrases = d.phrases; save(); }
+    } catch {}
+  }
+  openLesson(lessonInfo(ti, li), trial);
+}
 
 /* ---------- account, minutes and subscription ----------
    Accounts are Supabase users (email and password). The browser only ever holds the learner's own session;
@@ -446,7 +495,7 @@ const acct = {
   // After signing in: take the progress saved on the account if it is further along than this device's, otherwise save this device's.
   async sync(isNew) {
     const i = await this.refresh(); if (!i) return;
-    const far = st => st && st.profile && st.profile.done ? Object.keys(st.done || {}).length + 1 : 0;
+    const far = st => st && st.profile && st.profile.done ? 1 + Object.values(st.plans || {}).reduce((a, pl) => a + (pl.past || 0) + pl.themes.reduce((b, t) => b + t.lessons.filter(l => l.done).length, 0), 0) : 0;
     if (!isNew && far(i.state) > far(S)) { S = Object.assign({}, DEF, i.state); S.set = Object.assign({}, DEF.set, S.set); try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} }
     else this.push();
   },
@@ -472,6 +521,11 @@ function gate(kind, why) {
       <div class="err" id="authErr"></div><button class="btn block">${isNew ? 'Créer mon compte' : 'Me connecter'}</button></form>${isNew ? '<p style="font-size:13px;text-align:center;margin-top:10px">En créant un compte, tu acceptes nos <a href="/conditions" target="_blank" style="color:var(--teal)">conditions</a> et notre <a href="/confidentialite" target="_blank" style="color:var(--teal)">politique de confidentialité</a>.</p>' : ''}
       <button class="lnk" data-gate="${isNew ? 'login' : 'auth'}">${isNew ? 'J\'ai déjà un compte' : 'Créer un compte'}</button>
       ${isNew ? '' : '<button class="lnk" data-gate="forgot" style="color:var(--muted);font-weight:600">Mot de passe oublié ?</button>'}`;
+  } else if (kind === 'course') {
+    b.innerHTML = `<h2>Ajuster mon programme</h2><p>Change de niveau si c'est trop facile ou trop difficile. Tes progrès restent enregistrés.</p>
+      <div class="mins" style="margin-top:14px">${LEVELS.map((l, k) => `<button data-level="${k}" class="${k === levelIdx() ? 'sel' : ''}">${l}</button>`).join('')}</div>
+      <button class="btn block" id="newPlan" style="margin-top:16px">Créer un nouveau plan</button>
+      <button class="lnk" id="changeLang">Apprendre une autre langue</button>`;
   } else if (kind === 'forgot') {
     b.innerHTML = `<h2>Mot de passe oublié</h2><p>Indique ton email. Tu recevras un lien pour choisir un nouveau mot de passe.</p>
       <form id="authForm" data-mode="forgot"><input type="email" name="email" placeholder="Ton email" autocomplete="email" required>
@@ -491,6 +545,9 @@ function gate(kind, why) {
 $('#gateX').addEventListener('click', () => { $('#gate').hidden = true; });
 $('#gate').addEventListener('click', async e => {
   const sw = e.target.closest('[data-gate]'); if (sw) return gate(sw.dataset.gate);
+  const lv = e.target.closest('[data-level]'); if (lv) { $('#gateBody').querySelectorAll('[data-level]').forEach(x => x.classList.toggle('sel', x === lv)); return; }
+  if (e.target.closest('#newPlan')) { const k = +($('#gateBody .sel[data-level]') || {}).dataset.level; $('#gate').hidden = true; levelUp(isNaN(k) ? levelIdx() : k); return show('home'); }
+  if (e.target.closest('#changeLang')) { $('#gate').hidden = true; return startOnb(true); }
   const pl = e.target.closest('[data-plan]');
   if (pl && !pl.disabled) { pl.disabled = true;
     try { const r = await acct.api('?do=checkout', { method: 'POST', body: { plan: pl.dataset.plan } }); const j = await r.json(); if (j.url) return location.assign(j.url); throw new Error(j.error); }
@@ -528,31 +585,46 @@ $('#tabs').addEventListener('click', e => { const b = e.target.closest('button')
 
 /* ---------- home ---------- */
 function renderHome() {
-  const c = C(), cur = currentDay(), info = dayInfo(cur), n = doneCount();
-  $('#pairTag').textContent = `${c.target.code.toUpperCase()} · ${c.native.code.toUpperCase()}`;
+  const c = C(), pl = PLAN(), a = AV();
+  $('#pairTag').textContent = `${c.target.flag} ${pl ? pl.level : LEVELS[levelIdx()]}`;
   $('#streakTag').textContent = `${S.streak} jour${S.streak > 1 ? 's' : ''} de suite`;
-  let h = `<div class="hero"><img src="${esc(AV().thumb)}" alt="${esc(AV().name)}"><div style="flex:1;min-width:0">
-    <small>${n >= 90 ? 'Programme terminé' : `Jour ${cur} sur 90 · ${esc(info.level)}`}</small>
-    <h2>${esc(info.title)}</h2>
-    <button class="btn" data-day="${cur}">${n ? 'Continuer' : 'Commencer'} avec ${esc(AV().name)}</button></div></div>
-    <div class="overall"><span>Ta progression</span><span>${n} / 90 jours</span></div>
-    <div class="bar"><b style="width:${n / 90 * 100}%"></b></div>`;
-  for (const p of c.phases) {
-    h += `<div class="phase"><header><h3>${esc(p.name)}</h3><span class="lvl">${esc(p.level)}</span></header><p>${esc(p.goal)}</p><div class="days">`;
-    for (let d = p.from; d <= p.to; d++) {
-      const cls = S.done[d] ? 'done' : d === cur ? 'cur' : unlocked(d) ? '' : 'lock';
-      h += `<button class="day ${cls}" data-day="${d}" aria-label="Jour ${d}">${d}</button>`;
-    }
-    h += `</div></div>`;
+  if (!pl) {
+    $('#homeBody').innerHTML = `<div class="card" style="text-align:center;padding:28px 18px"><h3>On prépare ton programme…</h3><p class="sub" style="margin:8px 0 14px">Des thèmes choisis pour ton niveau et tes objectifs.</p><div class="typing" id="planWait"><i></i><i></i><i></i></div></div>`;
+    makePlan().then(renderHome).catch(() => { const w = $('#planWait'); if (w) w.outerHTML = '<button class="btn" id="planRetry">Réessayer</button>'; });
+    return;
   }
+  const all = lessonsOf(pl), n = all.filter(x => x.l.done).length, nx = nextLesson();
+  let h = nx ? `<div class="hero"><img src="${esc(a.thumb)}" alt="${esc(a.name)}"><div style="flex:1;min-width:0">
+    <small>${esc(nx.t.title)} · ${esc(pl.level)}</small><h2>${esc(nx.l.title)}</h2>
+    <button class="btn" data-les="${nx.ti}.${nx.li}">${n ? 'Continuer' : 'Commencer'} avec ${esc(a.name)}</button></div></div>`
+    : `<div class="hero"><img src="${esc(a.thumb)}" alt="${esc(a.name)}"><div style="flex:1;min-width:0"><small>Niveau ${esc(pl.level)} terminé</small><h2>Bravo, tu as fini ce niveau !</h2>
+    <button class="btn" id="nextLevel">${levelIdx() < LEVELS.length - 1 ? `Passer au niveau ${LEVELS[levelIdx() + 1]}` : 'Créer un nouveau plan'}</button></div></div>`;
+  h += `<button class="free" id="freeTalk"><span class="em">💬</span><span><b>Conversation libre</b><small>Parle de ce que tu veux avec ${esc(a.name)}</small></span><span class="go">›</span></button>
+    <div class="overall"><span>Niveau ${esc(pl.level)}</span><span>${n} / ${all.length} leçons</span></div><div class="bar"><b style="width:${all.length ? n / all.length * 100 : 0}%"></b></div>`;
+  pl.themes.forEach((t, ti) => {
+    const d = t.lessons.filter(l => l.done).length;
+    h += `<div class="phase"><header><h3>${esc(t.emoji || '')} ${esc(t.title)}</h3><span class="lvl">${d} / ${t.lessons.length}</span></header><div class="les">`;
+    t.lessons.forEach((l, li) => { h += `<button class="lrow ${l.done ? 'done' : nx && nx.ti === ti && nx.li === li ? 'cur' : ''}" data-les="${ti}.${li}"><i>${l.done ? '✓' : li + 1}</i><span><b>${esc(l.title)}</b><small>${esc(l.focus)}</small></span></button>`; });
+    h += `</div></div>`;
+  });
   $('#homeBody').innerHTML = h;
 }
 $('#homeBody').addEventListener('click', e => {
-  const b = e.target.closest('[data-day]'); if (!b) return;
-  const d = +b.dataset.day;
-  if (!unlocked(d)) return toast(`Termine d'abord le jour ${d - 1}`);
-  openLesson(d);
+  if (e.target.closest('#planRetry')) return renderHome();
+  if (e.target.closest('#freeTalk')) return openLesson(freeInfo());
+  if (e.target.closest('#nextLevel')) return levelUp();
+  const b = e.target.closest('[data-les]'); if (!b) return;
+  const [ti, li] = b.dataset.les.split('.').map(Number); openAt(ti, li);
 });
+// A finished level leads to the next one, with new themes. Progress already made is kept in the count.
+function levelUp(to) {
+  const old = PLAN(), avoid = old ? old.themes.map(t => t.title).join(', ') : '';
+  S.profile = S.profile || {}; S.profile.level = to != null ? to : Math.min(LEVELS.length - 1, levelIdx() + 1);
+  const past = old ? (old.past || 0) + lessonsOf(old).filter(x => x.l.done).length : 0;
+  delete S.plans[S.target]; save();
+  makePlan(avoid, past).then(renderHome).catch(() => {});   // started before the home screen asks for a plan of its own
+  renderHome();
+}
 
 /* ---------- speech out ---------- */
 const synth = window.speechSynthesis;
@@ -973,19 +1045,18 @@ const chat = $('#chat');
 const scrollDown = () => requestAnimationFrame(() => chat.scrollTop = chat.scrollHeight);
 function add(html, cls) { const d = document.createElement('div'); d.className = cls; d.innerHTML = html; chat.appendChild(d); scrollDown(); return d; }
 
-function openLesson(d, trial) {
+function openLesson(info, trial) {
   setTimeout(() => simli.warm(), 0);   // connect the live face while the learner reads the lesson card
-  const info = dayInfo(d);
   L = { info, history: [], turns: 0, mode: 'ai', step: 0, expect: null, complete: false, learned: [], busy: false, started: false, conv: null, log: [], fixes: [], t0: 0, reported: false, trial: !!trial, limit: trial ? 120 : 0 };
   loadSDK();
   micLang = 'target';
   chat.innerHTML = ''; $('#sugg').innerHTML = ''; $('#txt').value = '';
   $('#composer').hidden = true; $('#endBtn').hidden = true; $('#lesson').classList.remove('call'); camOff();
-  $('#dayPill').textContent = `Jour ${d} · ${info.level}`;
+  $('#dayPill').textContent = info.free ? info.level : `Leçon ${info.n} · ${info.level}`;
   $('#tutorName').textContent = AV().name; $('#timer').textContent = ''; $('#helpBtn').hidden = true; $('#cctl').hidden = true; $('#lost').hidden = true; $('#subs').innerHTML = ''; $('#lesson').classList.remove('audio'); $('#orb').querySelector('b').textContent = AV().name[0];
   show('lesson');
   face.use(AV()); face.start(); av3d.show();
-  add(`<h3>${esc(info.title)}</h3><p class="sub">${esc(info.focus)}. ${esc(info.scenario)}</p>
+  add(`<h3>${esc(info.title)}</h3><p class="sub">${esc(info.intro || info.focus)}</p>
     ${info.phrases.map((p, i) => `<button class="ph" data-say="${i}"><div><b>${esc(p.target)}</b><span>${esc(p.native)}</span></div>${ICON.spk}</button>`).join('')}
     <button class="btn block" id="startBtn" style="margin-top:14px">Appeler ${esc(AV().name)}</button>
     <div class="rowsw"><div><b>Mode audio seul</b><span>Sans avatar, pour pratiquer en marchant.</span></div><button class="sw ${S.set.audioOnly ? 'on' : ''}" id="audioSw" aria-label="Mode audio seul"></button></div>`, 'card');
@@ -999,7 +1070,7 @@ chat.addEventListener('click', e => {
   if (!L) return;
   const say = e.target.closest('[data-say]');
   if (say) { unlockAudio(); return speak([{ lang: 'target', text: L.info.phrases[+say.dataset.say].target }]); }
-  if (e.target.closest('#againBtn')) return openLesson(L.info.n);
+  if (e.target.closest('#againBtn')) return openLesson(L.info);
   if (e.target.closest('#textBtn')) { e.target.closest('.card').remove(); return textMode(); }
   const sw = e.target.closest('#audioSw'); if (sw) { S.set.audioOnly = !S.set.audioOnly; save(); return sw.classList.toggle('on', S.set.audioOnly); }
   const pc = e.target.closest('.pc'); if (pc) return speak([{ lang: 'target', text: pc.dataset.t }]);
@@ -1080,33 +1151,41 @@ const simli = {
   },
 };
 const releaseWake = () => { if (wake) { wake.release().catch(() => {}); wake = null; } };
-const balance = d => d <= 15 ? 'Speak mostly French, like a friend who happens to be a teacher. Every turn contains one or two short Dutch phrases for the learner to hear and say. Go slowly.'
-  : d <= 30 ? 'About half French, half Dutch. Small talk and questions in simple Dutch, explanations and help in French.'
-  : d <= 45 ? 'Mostly Dutch, in short sentences. Use French only for a quick explanation or when the learner is stuck.'
-  : d <= 60 ? 'Dutch only, simple and clear. Switch to French for one sentence only if the learner is truly lost.'
-  : 'Dutch only, at natural speed, with natural everyday phrasing. French only if the learner explicitly asks for it.';
-const greeting = (d, t) => greetFirst(d, t) || (d <= 15 ? `Hallo ! C'est ${AV().name}. ${AV().gender === 'M' ? 'Content' : 'Contente'} de te retrouver. Aujourd'hui, on voit ensemble: ${t.toLowerCase()}. Ça te va ?`
-  : d <= 30 ? 'Hallo! Hoe gaat het? Tu as passé une bonne journée ?'
-  : d <= 60 ? 'Hoi! Leuk je weer te zien. Hoe gaat het met je vandaag?'
-  : 'Hé, hallo! Hoe is het? Vertel, wat heb je vandaag gedaan?');
-// very first call with this learner: the tutor introduces themself, and uses the learner's name when known
-function greetFirst(d, t) {
-  if (doneCount() || (L && !L.trial && d !== startDay())) return '';
-  const a = AV(), n = S.profile && S.profile.name, m = a.gender === 'M';
-  return `Hallo${n ? ' ' + n : ''} ! Moi c'est ${a.name}, ${m ? 'ton' : 'ta'} prof de néerlandais. ${m ? 'Ravi' : 'Ravie'} de te rencontrer ! ${n ? 'Tu es prêt pour ton premier appel ?' : 'Dis-moi, comment tu t\'appelles ?'}`;
+const balance = () => { const n = C().native.en, t = C().target.en, lv = levelIdx();
+  return lv <= 1 ? `Speak mostly ${n}, like a friend who happens to be a teacher. Every turn contains one or two short ${t} phrases for the learner to hear and say. Go slowly.`
+  : lv === 2 ? `About half ${n}, half ${t}. Small talk and questions in simple ${t}, explanations and help in ${n}.`
+  : lv === 3 ? `Mostly ${t}, in short clear sentences. Use ${n} only for a quick explanation or when the learner is stuck.`
+  : `${t} only, at natural speed, with natural everyday phrasing. ${n} only if the learner explicitly asks for it.`; };
+// The tutor's first sentence. Beginners are greeted in their own language, with a hello in the language they learn; later on, in that language.
+const GREET = {
+  fr: { first: (h, n, a, m, l) => `${h}${n} ! Moi c'est ${a}, ${m ? 'ton' : 'ta'} prof ${/^[aeiouh]/i.test(l) ? "d'" : 'de '}${l}. ${m ? 'Ravi' : 'Ravie'} de te rencontrer ! On commence ?`, back: (h, a, t) => `${h} ! C'est ${a}. Aujourd'hui : ${t}. On y va ?`, free: (h, a) => `${h} ! C'est ${a}. De quoi as-tu envie de parler aujourd'hui ?`, cut: 'Ah, te revoilà ! On a été coupés. On reprend où on en était ?' },
+  en: { first: (h, n, a, m, l) => `${h}${n}! I'm ${a}, your ${l} tutor. Lovely to meet you! Shall we start?`, back: (h, a, t) => `${h}! It's ${a}. Today: ${t}. Shall we?`, free: (h, a) => `${h}! It's ${a}. What would you like to talk about today?`, cut: 'Ah, there you are! We got cut off. Shall we pick up where we left off?' },
+  de: { first: (h, n, a, m, l) => `${h}${n}! Ich bin ${a}, ${m ? 'dein Lehrer' : 'deine Lehrerin'} für ${l}. Schön, dich kennenzulernen! Wollen wir anfangen?`, back: (h, a, t) => `${h}! Hier ist ${a}. Heute: ${t}. Los geht's?`, free: (h, a) => `${h}! Hier ist ${a}. Worüber möchtest du heute sprechen?`, cut: 'Ah, da bist du wieder! Die Verbindung war weg. Machen wir da weiter, wo wir waren?' },
+  es: { first: (h, n, a, m, l) => `¡${h}${n}! Soy ${a}, tu ${m ? 'profesor' : 'profesora'} de ${l}. ¡${m ? 'Encantado' : 'Encantada'} de conocerte! ¿Empezamos?`, back: (h, a, t) => `¡${h}! Soy ${a}. Hoy: ${t}. ¿Vamos?`, free: (h, a) => `¡${h}! Soy ${a}. ¿De qué te apetece hablar hoy?`, cut: '¡Ah, aquí estás! Se cortó la llamada. ¿Seguimos donde lo dejamos?' },
+  it: { first: (h, n, a, m, l) => `${h}${n}! Sono ${a}, ${m ? 'il tuo' : 'la tua'} insegnante di ${l}. Piacere di conoscerti! Cominciamo?`, back: (h, a, t) => `${h}! Sono ${a}. Oggi: ${t}. Andiamo?`, free: (h, a) => `${h}! Sono ${a}. Di cosa ti va di parlare oggi?`, cut: 'Ah, rieccoti! È caduta la linea. Riprendiamo da dove eravamo?' },
+  nl: { first: (h, n, a, m, l) => `${h}${n}! Ik ben ${a}, je ${m ? 'leraar' : 'lerares'} ${l}. Leuk je te ontmoeten! Zullen we beginnen?`, back: (h, a, t) => `${h}! Met ${a}. Vandaag: ${t}. Zullen we?`, free: (h, a) => `${h}! Met ${a}. Waar wil je het vandaag over hebben?`, cut: 'Ah, daar ben je weer! De verbinding viel weg. Gaan we verder waar we waren?' },
+};
+const GREET_T = { fr: 'Bonjour ! Ça me fait plaisir de te revoir. Comment ça va aujourd\'hui ?', en: 'Hi! Good to see you again. How are you today?', de: 'Hallo! Schön, dich wiederzusehen. Wie geht es dir heute?',
+  es: '¡Hola! Qué bien verte de nuevo. ¿Cómo estás hoy?', it: 'Ciao! Che bello rivederti. Come stai oggi?', nl: 'Hoi! Leuk je weer te zien. Hoe gaat het met je vandaag?' };
+function greeting(info, resume) {
+  const g = GREET[S.native] || GREET.fr, a = AV(), h = LANGS[S.target].hello, n = S.profile && S.profile.name;
+  if (resume) return g.cut;
+  if (!S.greeted || (L && L.trial)) return g.first(h, n ? ' ' + n : '', a.name, a.gender === 'M', C().target.name);   // very first call: the tutor introduces themself
+  if (levelIdx() >= 2) return GREET_T[S.target];
+  return info.free ? g.free(h, a.name) : g.back(h, a.name, info.title);
 }
 // what the tutor knows about the learner, from the questionnaire
 function learnerText() {
-  const p = S.profile, o = OB();
-  if (!p || p.done !== true) return 'A French speaker learning Dutch. Nothing else is known yet: ask their first name and why they are learning.';
+  const p = S.profile, o = OB(), n = C().native.en, t = C().target.en;
+  if (!p || p.done !== true) return `A ${n} speaker learning ${t}. Nothing else is known yet: ask their first name and why they are learning.`;
   const goal = o.goals.find(g => g.id === p.goal), places = (o.places[p.goal] || []).filter(x => (p.places || []).includes(x[0])).map(x => x[3]);
   const skills = o.skills.filter(x => (p.skills || []).includes(x[0])).map(x => x[3]);
   return [
-    `First name: ${p.name}. ${p.gender === 'f' ? 'She is a woman: use feminine agreement in French.' : p.gender === 'm' ? 'He is a man: use masculine agreement in French.' : 'Gender not given: avoid gendered agreement in French.'}`,
-    goal ? `Why they learn Dutch: ${goal.en}.` : '',
+    `First name: ${p.name}. ${p.gender === 'f' ? `She is a woman: use feminine agreement in ${n}.` : p.gender === 'm' ? `He is a man: use masculine agreement in ${n}.` : `Gender not given: avoid gendered agreement in ${n}.`}`,
+    goal ? `Why they learn ${t}: ${goal.en}.` : '',
     places.length ? `Where they want to use it: ${places.join(', ')}. Take your examples and role plays from these situations.` : '',
-    p.variant === 'be' ? 'They want Belgian Dutch (Flemish): use the vocabulary, expressions and politeness habits of Flanders, and mention it when the Netherlands says it differently.' : 'They want the Dutch of the Netherlands.',
-    `Level from a vocabulary check: ${o.levelsEn[p.level || 0]}.`,
+    S.target !== 'nl' ? '' : p.variant === 'be' ? 'They want Belgian Dutch (Flemish): use the vocabulary, expressions and politeness habits of Flanders, and mention it when the Netherlands says it differently.' : 'They want the Dutch of the Netherlands.',
+    `Level they chose: ${o.levelsEn[p.level || 0]}.`,
     skills.length ? `What they want to improve most: ${skills.join(', ')}.` : '',
     (p.interests || []).length ? `Topics they enjoy, for small talk and examples: ${o.interests.filter(x => p.interests.includes(x[0])).map(x => x[3]).join(', ')}.` : '',
     p.correct === 'all' ? 'Correction: they asked to be corrected on everything. Correct each mistake briefly, right away, then move on.'
@@ -1140,7 +1219,7 @@ async function subTutor(text) {
   const d = sub(esc(text), 'line her');
   if (S.set.subs < 2) return;
   try {
-    const r = await fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ translate: text, targetName: C().target.name, nativeName: C().native.name }) });
+    const r = await fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ translate: text, targetName: C().target.en, nativeName: C().native.en }) });
     if (r.ok && d.isConnected) { const t = (await r.json()).translation; if (t && norm(t) !== norm(text)) { const sm = document.createElement('small'); sm.textContent = t; d.appendChild(sm); } }
   } catch {}
 }
@@ -1159,12 +1238,12 @@ async function startCall0(resume) {
   const { token, signedUrl, maxSeconds } = await r.json();
   const opts = {
     dynamicVariables: { day: String(i.n), level: i.level, lesson_title: i.title, focus: i.focus, scenario: i.scenario,
-      phrases: i.phrases.map(p => `- ${p.target} = ${p.native}`).join('\n'), balance: balance(i.n),
-      greeting: resume ? 'Ah, te revoilà ! On a été coupés. On reprend où on en était ?' : greeting(i.n, i.title),
+      phrases: i.phrases.map(p => `- ${p.target} = ${p.native}`).join('\n'), balance: balance(), target_language: C().target.en + (S.target === 'nl' && S.profile && S.profile.variant === 'be' ? ' (Flemish, as spoken in Belgium)' : ''), native_language: C().native.en,
+      greeting: greeting(i, resume),
       tutor_name: av.name, persona: av.persona, learner: learnerText(),
       recap: resume && L.log.length ? '# Earlier in this call (the line dropped, you are picking up where you left off)\n' + L.log.slice(-8).map(m => `${m.role === 'user' ? 'Learner' : 'You'}: ${m.text}`).join('\n') : '',
       ...(L.trial ? { lesson_title: 'Premier appel de découverte', scenario: 'A first call of about two minutes. Get to know the learner in a few words, then teach one or two useful phrases linked to their goal. When about two minutes have passed, wrap up warmly and say you look forward to the next call.' } : {}) },
-    overrides: { tts: { voiceId: tutorVoice() } },
+    overrides: { tts: { voiceId: tutorVoice() }, agent: { language: S.native } },   // speech recognition follows the learner's own language
     clientTools: {
       show_phrase: ({ dutch, french }) => { if (L !== mine || !dutch) return; learn({ target: dutch, native: french || '' });
         add(`${ICON.spk}<div><b>${esc(dutch)}</b><span>${esc(french)}</span></div>`, 'pc').dataset.t = dutch;
@@ -1212,7 +1291,8 @@ async function startCall0(resume) {
   // minutes: tell the server which call this is, and hang up politely when the time included in the offer runs out
   try { L.cid = conv.getId && conv.getId(); } catch {}
   if (acct.on && tk && L.cid) acct.api('?do=call', { method: 'POST', body: { conversationId: L.cid } }).catch(() => {});
-  if (acct.on && !tk) { S.trialDone = true; save(); }
+  if (acct.on && !tk) S.trialDone = true;
+  S.greeted = true; save();
   if (maxSeconds) { clearTimeout(L.cap); L.cap = setTimeout(() => { if (L === mine && L.conv === conv) { L.capped = true; toast('Ton temps d\'appel est écoulé'); endCall(); } }, maxSeconds * 1000); }
   try { face.attach(conv.output && conv.output.getAnalyser && conv.output.getAnalyser()); } catch {}
   if (simli.ready) simli.attach(conv, mine); else live.then(ok => { if (ok) simli.attach(conv, mine, true); });
@@ -1281,7 +1361,7 @@ async function afterCall() {
   let rep = null;
   try {
     const r = await fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-      day: i.n, level: i.level, title: i.title, targetName: C().target.name, nativeName: C().native.name, transcript: L.log }) });
+      day: i.n, level: i.level, title: i.title, targetName: C().target.en, nativeName: C().native.en, transcript: L.log }) });
     if (r.ok) rep = await r.json();
   } catch {}
   if (L !== mine) return;
@@ -1292,7 +1372,7 @@ async function afterCall() {
     <p style="margin:12px 0 0">${esc(rep.summary)}</p>
     <h4>3 points à retenir</h4>${keep.length ? `<ul>${keep.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '<p style="margin:0;color:var(--muted)">Rien de nouveau cette fois.</p>'}
     <h4>3 corrections principales</h4>${fixes.length ? fixes.map(f => `<div class="fx"><s>${esc(f.said)}</s><b>${esc(f.correct)}</b><span>${esc(f.why)}</span></div>`).join('') : '<p style="margin:0;color:var(--muted)">Aucune faute importante. Bravo.</p>'}
-    <button class="btn block teal" id="doneBtn" style="margin-top:16px">Valider le jour ${i.n}</button>
+    <button class="btn block teal" id="doneBtn" style="margin-top:16px">${i.free ? 'Terminer' : 'Valider la leçon'}</button>
     <button class="btn block ghost" id="againBtn" style="margin-top:8px">Refaire l'appel</button>`;
   if (acct.on && !acct.s) setTimeout(() => gate('auth', 'Bravo pour ce premier appel ! Crée ton compte pour garder ta progression. 10 minutes d\'appel sont offertes.'), 1800);
   else if (L.capped && acct.info && acct.info.plan === 'free') setTimeout(() => gate('plans', 'Tes minutes offertes sont utilisées'), 1800);
@@ -1303,7 +1383,7 @@ async function translate(el) {
   const h = el.querySelector('.hint'); if (h) h.textContent = 'Traduction…';
   let t = '';
   try {
-    const r = await fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ translate: el.dataset.x, targetName: C().target.name, nativeName: C().native.name }) });
+    const r = await fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ translate: el.dataset.x, targetName: C().target.en, nativeName: C().native.en }) });
     if (r.ok) t = (await r.json()).translation;
   } catch {}
   if (h) h.remove();
@@ -1383,7 +1463,7 @@ async function askTutor() {
   let res;
   try {
     res = await fetch('/api/tutor', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-      day: i.n, tutor: c.tutor, targetName: c.target.name, nativeName: c.native.name, level: i.level,
+      day: i.n, tutor: c.tutor, targetName: c.target.en, nativeName: c.native.en, level: i.level,
       title: i.title, focus: i.focus, scenario: i.scenario, phrases: i.phrases, history: L.history }) });
   } catch { throw Object.assign(new Error('offline'), { fatal: false }); }
   if (!res.ok) throw Object.assign(new Error('tutor'), { fatal: res.status === 503 || res.status === 404 || res.status === 405 });
@@ -1438,14 +1518,14 @@ function render(r) {
   $('#sugg').innerHTML = (r.suggestions || []).slice(0, 3).map(s => `<button data-t="${esc(s.target)}"><b>${esc(s.target)}</b><span>${esc(s.native)}</span></button>`).join('');
   if (r.lesson_complete && !L.complete) {
     L.complete = true; $('#sugg').innerHTML = ''; $('#composer').hidden = true;
-    add(`<h3>Leçon terminée</h3><p class="sub">Jour ${L.info.n} validé. Tes phrases sont ajoutées à tes révisions.</p><button class="btn block teal" id="doneBtn">Valider le jour ${L.info.n}</button>`, 'card');
+    add(`<h3>Leçon terminée</h3><p class="sub">Bravo. Tes phrases sont ajoutées à tes révisions.</p><button class="btn block teal" id="doneBtn">Valider le jour ${L.info.n}</button>`, 'card');
   }
 }
 
 function finish() {
   if (!L) return;
-  const d = L.info.n, first = !S.done[d];
-  S.done[d] = true;
+  const i = L.info, pl = PLAN(), les = !i.free && pl && pl.themes[i.ti] && pl.themes[i.ti].lessons[i.li], first = !!les && !les.done;
+  if (les) les.done = true;
   const t = today();
   if (S.last !== t) {
     const y = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
@@ -1455,7 +1535,7 @@ function finish() {
     if (p.target && p.native && !S.cards.some(c => c.t === p.target)) S.cards.push({ t: p.target, n: p.native, box: 0, due: Date.now() });
   save();
   closeLesson();
-  toast(first ? (d === 90 ? 'Programme terminé. Gefeliciteerd!' : `Jour ${d} validé. Goed gedaan!`) : 'Révision enregistrée');
+  toast(i.free ? 'Conversation enregistrée' : first ? 'Leçon validée. Bravo !' : 'Révision enregistrée');
 }
 
 /* ---------- review ---------- */
@@ -1503,10 +1583,9 @@ function renderSettings() {
     <div class="set"><div><b>Mon prof</b><span>${esc(AV().name)}, ${esc(AV().trait.toLowerCase())}. Touche un visage pour changer.</span>
       <div class="pick" id="pickTutor">${window.AVATARS.map(a => `<button data-av="${a.id}" class="${a.id === AV().id ? 'sel' : ''}"><img src="${a.thumb}" alt="">${esc(a.name)}</button>`).join('')}</div></div></div>
     <div class="set"><div><b>Mon profil</b><span>${S.profile && S.profile.done === true ? `${esc(S.profile.name)} · ${esc(OB().levels[S.profile.level || 0])} · ${S.profile.variant === 'be' ? 'Belgique' : 'Pays-Bas'} · ${S.profile.minutes || 10} min par jour` : 'Questionnaire pas encore rempli.'}</span></div><button class="btn ghost" id="editProfile">Modifier</button></div>
-    <div class="set"><div><b>Cours</b><span>${esc(c.target.name)} depuis le ${esc(c.native.name)}. D'autres langues arrivent.</span></div></div>
+    <div class="set"><div><b>Ma langue</b><span>${c.target.flag} ${esc(c.target.name)} · niveau ${esc((PLAN() || {}).level || LEVELS[levelIdx()])}</span></div><button class="btn ghost" id="editCourse">Ajuster</button></div>
     <div class="set"><div><b>Vitesse de la voix</b><span>Ralentis au début, accélère ensuite.</span></div><input type="range" id="rate" min="0.6" max="1.1" step="0.05" value="${s.rate}"></div>
     <div class="set"><div><b>Afficher les traductions</b><span>Désactive pour deviner avant de toucher la phrase.</span></div><button class="sw ${s.showTr ? 'on' : ''}" data-k="showTr" aria-label="Traductions"></button></div>
-    <div class="set"><div><b>Débloquer tous les jours</b><span>Pour choisir librement dans le programme.</span></div><button class="sw ${s.unlockAll ? 'on' : ''}" data-k="unlockAll" aria-label="Débloquer"></button></div>
     <div class="set"><div><b>Cadrage en direct</b><span>Vers la gauche, on voit le prof de plus loin. S'applique au prochain appel.</span></div><input type="range" id="liveZoom" min="0.5" max="1.2" step="0.05" value="${s.liveZoom || 0.7}"></div>
 <div class="set"><div><b>Vitesse des lèvres</b><span>Vers la gauche, le prof parle avec des gestes plus lents.</span></div><input type="range" id="lipSpeed" min="0.3" max="1" step="0.05" value="${s.lipSpeed || 0.6}"></div>
     <div class="set"><div><b>Retard des lèvres</b><span>Si la bouche bouge avant le son sur ton téléphone, augmente un peu. Actuel : ${s.lipDelay || 0} ms.</span></div><input type="range" id="lipDelay" min="0" max="300" step="20" value="${s.lipDelay || 0}"></div>
@@ -1519,37 +1598,36 @@ $('#settingsBody').addEventListener('click', e => {
   const sw = e.target.closest('.sw');
   if (sw) { S.set[sw.dataset.k] = !S.set[sw.dataset.k]; save(); return renderSettings(); }
   if (e.target.closest('#testVoice')) unlockAudio();
-  if (e.target.closest('#testVoice')) return speak([{ lang: 'target', text: C().days[0][3][2][0] }, { lang: 'native', text: C().days[0][3][2][1] }]);
+  if (e.target.closest('#testVoice')) return speak([{ lang: 'target', text: LANGS[S.target].hello + '!' }, { lang: 'native', text: LANGS[S.native].hello + ' !' }]);
   const pk = e.target.closest('[data-av]'); if (pk) { S.set.avatar = pk.dataset.av; save(); unlockAudio(); player.src = AV().sample; player.play().catch(() => {}); return renderSettings(); }
   if (e.target.closest('#accLogin')) return gate('login');
   if (e.target.closest('#accPlans')) return gate('plans');
   if (e.target.closest('#accOut')) { acct.push(); acct.out(); toast('Déconnecté'); return renderSettings(); }
   if (e.target.closest('#accPortal')) return acct.api('?do=portal', { method: 'POST' }).then(r => r.json()).then(j => j.url ? location.assign(j.url) : toast('Indisponible pour le moment')).catch(() => toast('Indisponible pour le moment'));
+  if (e.target.closest('#editCourse')) return gate('course');
   if (e.target.closest('#editProfile')) return startOnb(true);
   if (e.target.closest('#reset') && confirm('Effacer toute ta progression ?')) { S = structuredClone(DEF); save(); R = null; startOnb(); toast('Progression effacée'); }
 });
 $('#settingsBody').addEventListener('change', e => { if (e.target.id === 'rate') { S.set.rate = +e.target.value; save(); } if (e.target.id === 'lipSpeed') { S.set.lipSpeed = +e.target.value; save(); } if (e.target.id === 'liveZoom') { S.set.liveZoom = +e.target.value; save(); } if (e.target.id === 'lipDelay') { S.set.lipDelay = +e.target.value; save(); renderSettings(); } });
 
 /* ---------- onboarding questionnaire ---------- */
-const OB = () => window.ONBOARDING[S.pair] || window.ONBOARDING['nl-fr'];
-const STEPS = ['name', 'goal', 'places', 'info1', 'variant', 'skills', 'interests', 'words', 'info2', 'correct', 'style', 'match', 'ready'];
+const OB = () => window.ONBOARDING.fr;
+const STEPS = ['native', 'target', 'name', 'level', 'goal', 'places', 'variant', 'skills', 'interests', 'correct', 'style', 'match', 'ready'];
+const skipStep = st => st === 'variant' && S.target !== 'nl';   // only Dutch has a Belgium or Netherlands choice
 let ob = null;
 function startOnb(edit) {
   S.profile = S.profile || {};
-  ob = { i: edit ? 0 : Math.min(STEPS.length - 1, S.profile.step || 0), stage: 'a', picking: false, edit: !!edit, known: new Set() };
+  ob = { i: edit ? 0 : Math.min(STEPS.length - 1, S.profile.step || 0), picking: false, edit: !!edit, nat: !!edit || !!(S.profile.step), tgt: !!edit || !!(S.profile.step) };
   show('onb');
 }
 function obGo(d) {
   ob.i = Math.max(0, Math.min(STEPS.length - 1, ob.i + d)); ob.picking = false;
+  while (skipStep(STEPS[ob.i]) && ob.i > 0 && ob.i < STEPS.length - 1) ob.i += d < 0 ? -1 : 1;
   S.profile.step = ob.i; save();                      // so the learner can leave and come back
   renderOnb(); $('#obBody').scrollTop = 0;
 }
 const optRow = (id, em, t, sub, sel) => `<button class="opt ${sel ? 'sel' : ''}" data-o="${esc(id)}"><span class="em">${em}</span><span>${esc(t)}${sub ? `<small>${esc(sub)}</small>` : ''}</span></button>`;
 const tagsOf = a => `<div class="tags">${a.tags.map(x => `<span>${esc(x)}</span>`).join('')}<span>${a.age} ans</span></div>`;
-function obLevel() {
-  const o = OB(), p = S.profile, ka = [...ob.known].filter(w => o.words.a.includes(w)).length, kb = [...ob.known].filter(w => o.words.b.includes(w)).length;
-  p.level = ka === 0 ? 0 : ka < 8 ? 1 : ka < 18 ? 2 : kb < 8 ? 3 : 4;
-}
 function renderOnb() {
   if (!ob) return;
   const o = OB(), p = S.profile, step = STEPS[ob.i], body = $('#obBody'), foot = $('#obFoot');
@@ -1559,40 +1637,32 @@ function renderOnb() {
   $('#obSkip').style.visibility = step === 'ready' ? 'hidden' : 'visible';
   const next = (label, ok) => `<button class="btn" id="obNext" ${ok === false ? 'disabled' : ''}>${label || 'Continuer'}</button>`;
   foot.innerHTML = '';
-  if (step === 'name') {
+  const langRow = (l, sel, label) => `<button class="opt ${sel ? 'sel' : ''}" data-o="${l.code}"><span class="em">${l.flag}</span><span>${esc(label)}</span></button>`;
+  if (step === 'native') {
+    body.innerHTML = `<h1>Quelle est ta langue ?</h1><p class="lead">Ton prof t'expliquera dans cette langue.</p><div class="opts">${Object.values(LANGS).map(l => langRow(l, S.native === l.code && ob.nat, l.self)).join('')}</div>`;
+  } else if (step === 'target') {
+    body.innerHTML = `<h1>Quelle langue veux-tu apprendre ?</h1><p class="lead"></p><div class="opts">${Object.values(LANGS).filter(l => l.code !== S.native).map(l => langRow(l, S.target === l.code && ob.tgt, l.names[S.native][0].toUpperCase() + l.names[S.native].slice(1))).join('')}</div>`;
+  } else if (step === 'level') {
+    body.innerHTML = `<h1>Quel est ton niveau en ${esc(C().target.name)} ?</h1><p class="lead">Lingovia s'adapte à ton niveau, quel qu'il soit.</p><div class="opts">${LEVELS.map((l, k) => `<button class="opt ${p.level === k ? 'sel' : ''}" data-o="${k}"><span class="em" style="font-weight:800;font-size:17px;color:var(--accent)">${l}</span><span>${esc(o.levels[k])}</span></button>`).join('')}</div>`;
+  } else if (step === 'name') {
     body.innerHTML = `<h1>Comment tu t'appelles ?</h1><p class="lead">Ton prof t'appellera par ton prénom.</p>
       <input class="obin" id="obName" placeholder="Ton prénom" maxlength="24" autocomplete="given-name" value="${esc(p.name || '')}">
-      <p class="lead" style="margin-bottom:10px">Pour bien accorder ses phrases en français :</p>
+      <p class="lead" style="margin-bottom:10px">Pour que ton prof accorde bien ses phrases :</p>
       <div class="opts">${optRow('m', '👨', 'Homme', '', p.gender === 'm')}${optRow('f', '👩', 'Femme', '', p.gender === 'f')}${optRow('x', '🤔', 'Je préfère ne pas le dire', '', p.gender === 'x')}</div>`;
     foot.innerHTML = next('Continuer', !!(p.name && p.gender));
   } else if (step === 'goal') {
-    body.innerHTML = `<h1>Pourquoi veux-tu apprendre le ${esc(C().target.name)} ?</h1><p class="lead"></p><div class="opts">${o.goals.map(g => optRow(g.id, g.e, g.t, '', p.goal === g.id)).join('')}</div>`;
+    body.innerHTML = `<h1>Pourquoi veux-tu apprendre cette langue ?</h1><p class="lead"></p><div class="opts">${o.goals.map(g => optRow(g.id, g.e, g.t, '', p.goal === g.id)).join('')}</div>`;
   } else if (step === 'places') {
     body.innerHTML = `<h1>Où vas-tu t'en servir ?</h1><p class="lead">Choisis tout ce qui te concerne.</p><div class="opts">${(o.places[p.goal] || o.places.fun).map(x => optRow(x[0], x[1], x[2], '', (p.places || []).includes(x[0]))).join('')}</div>`;
     foot.innerHTML = next('Continuer', (p.places || []).length > 0);
-  } else if (step === 'info1') {
-    const list = (o.places[p.goal] || []).filter(x => (p.places || []).includes(x[0])).map(x => x[2].toLowerCase());
-    body.innerHTML = `<h1>Compris${p.name ? ', ' + esc(p.name) : ''} !</h1><p class="lead"></p><div class="obinfo"><p>On construit tes conversations autour de ce qui compte pour toi : <b>${esc(list.slice(0, 3).join(', '))}</b>.</p>
-      <p style="margin-top:12px">Bonne nouvelle : le ${esc(C().target.name)} partage beaucoup de mots avec le français et l'anglais. Pour un francophone, le plus délicat est l'ordre des mots et le son « g ». On les travaille dès le début, à l'oral.</p></div>`;
-    foot.innerHTML = next();
   } else if (step === 'variant') {
-    body.innerHTML = `<h1>Quel ${esc(C().target.name)} veux-tu parler ?</h1><p class="lead">Le vocabulaire et l'accent de ton prof s'adaptent.</p><div class="opts">${o.variants.map(v => optRow(v.id, v.e, v.t, v.s, p.variant === v.id)).join('')}</div>`;
+    body.innerHTML = `<h1>Quel néerlandais veux-tu parler ?</h1><p class="lead">Le vocabulaire et l'accent de ton prof s'adaptent.</p><div class="opts">${o.variants.map(v => optRow(v.id, v.e, v.t, v.s, p.variant === v.id)).join('')}</div>`;
   } else if (step === 'skills') {
     body.innerHTML = `<h1>Que veux-tu améliorer en priorité ?</h1><p class="lead">Choisis une ou plusieurs réponses.</p><div class="opts">${o.skills.map(x => optRow(x[0], x[1], x[2], '', (p.skills || []).includes(x[0]))).join('')}</div>`;
     foot.innerHTML = next('Continuer', (p.skills || []).length > 0);
   } else if (step === 'interests') {
     body.innerHTML = `<h1>De quoi aimes-tu parler ?</h1><p class="lead">Ton prof choisira ses sujets de conversation là-dedans.</p><div class="chips">${o.interests.map(x => `<button class="wchip ${(p.interests || []).includes(x[0]) ? 'sel' : ''}" data-int="${x[0]}">${x[1]} ${esc(x[2])}</button>`).join('')}</div>`;
     foot.innerHTML = next('Continuer', (p.interests || []).length > 0);
-  } else if (step === 'words') {
-    const list = o.words[ob.stage], all = list.every(w => ob.known.has(w));
-    body.innerHTML = `<h1>Touche les mots que tu connais</h1><p class="lead">${ob.stage === 'a' ? 'Niveau débutant. Pas de piège : ça sert à régler ton point de départ.' : 'Tu en connais beaucoup. Et ceux-ci, plus difficiles ?'}</p>
-      <div class="chips">${list.map(w => `<button class="wchip ${ob.known.has(w) ? 'sel' : ''}" data-w="${esc(w)}">${esc(w)}</button>`).join('')}</div>`;
-    foot.innerHTML = `<label><input type="checkbox" id="obAll" ${all ? 'checked' : ''}> Je les connais tous</label>` + next(ob.known.size && [...ob.known].some(w => list.includes(w)) ? 'Continuer' : 'Je n\'en connais aucun');
-  } else if (step === 'info2') {
-    const lv = p.level || 0, how = lv <= 1 ? 'Ton prof t\'expliquera en français et introduira le néerlandais petit à petit.' : lv === 2 ? 'Ton prof alternera français et néerlandais simple.' : 'Ton prof te parlera presque uniquement en néerlandais.';
-    body.innerHTML = `<h1>Un programme à ton niveau</h1><p class="lead"></p><div class="obinfo"><p>Ton point de départ : <b>${esc(o.levels[lv])}</b>.</p><p style="margin-top:10px">${how}</p>
-      <div class="faces">${window.AVATARS.map(a => `<img src="${a.thumb}" alt="">`).join('')}</div><p style="font-size:14px;color:var(--muted)">Encore deux questions pour trouver ton prof.</p></div>`;
-    foot.innerHTML = next();
   } else if (step === 'correct') {
     body.innerHTML = `<h1>À quel point veux-tu qu'on te corrige ?</h1><p class="lead"></p><div class="opts">${optRow('key', '🎯', 'Seulement les fautes importantes', 'Pour parler sans s\'arrêter', p.correct === 'key')}${optRow('flow', '🌊', 'Au fur et à mesure', 'Ton prof reformule en douceur', p.correct === 'flow')}${optRow('all', '🔍', 'Corrige tout', 'Chaque faute, tout de suite', p.correct === 'all')}</div>`;
   } else if (step === 'style') {
@@ -1609,25 +1679,28 @@ function renderOnb() {
       foot.innerHTML = next(`Continuer avec ${esc(a.name)}`) + `<button class="btn ghost" id="obOther">Choisir un autre prof</button>`;
     }
   } else if (step === 'ready') {
-    const goal = o.goals.find(g => g.id === p.goal), a = AV(); p.minutes = p.minutes || 10;
-    body.innerHTML = `<h1>Ton programme est prêt${p.name ? ', ' + esc(p.name) : ''}</h1><p class="lead">Voici ce qu'on a préparé pour toi.</p>
-      <div class="sum"><div><span>Objectif</span><b>${esc(goal ? goal.t : '')}</b></div><div><span>${esc(C().target.name[0].toUpperCase() + C().target.name.slice(1))}</span><b>${p.variant === 'be' ? 'Belgique' : 'Pays-Bas'}</b></div>
-        <div><span>Point de départ</span><b>${esc(o.levels[p.level || 0])}, jour ${o.startDay[p.level || 0]}</b></div><div><span>Corrections</span><b>${{ key: 'Fautes importantes', all: 'Tout corriger' }[p.correct] || 'Au fur et à mesure'}</b></div>
+    const goal = o.goals.find(g => g.id === p.goal), a = AV(), pl = PLAN(); p.minutes = p.minutes || 10;
+    if (!pl && !ob.making && !ob.failed) { ob.making = true; makePlan().then(() => { if (ob) { ob.making = false; renderOnb(); } }).catch(() => { if (ob) { ob.making = false; ob.failed = true; renderOnb(); } }); }
+    body.innerHTML = `<h1>${pl ? 'Ton programme est prêt' : 'On prépare ton programme'}${p.name ? ', ' + esc(p.name) : ''}</h1><p class="lead">${pl ? 'Voici ce qu\'on a préparé pour toi.' : 'Des thèmes choisis pour ton niveau et tes objectifs. Quelques secondes…'}</p>
+      <div class="sum"><div><span>Langue</span><b>${C().target.flag} ${esc(C().target.name)}</b></div><div><span>Niveau de départ</span><b>${LEVELS[levelIdx()]}</b></div>
+        <div><span>Objectif</span><b>${esc(goal ? goal.t : '')}</b></div><div><span>Corrections</span><b>${{ key: 'Fautes importantes', all: 'Tout corriger' }[p.correct] || 'Au fur et à mesure'}</b></div>
         <div><span>Ton prof</span><b>${esc(a.name)}</b></div></div>
+      ${pl ? `<p class="lead" style="margin:18px 0 8px">Tes premiers thèmes</p><div class="chips">${pl.themes.slice(0, 6).map(t => `<span class="wchip" style="cursor:default">${esc(t.emoji || '')} ${esc(t.title)}</span>`).join('')}</div>`
+        : ob.failed ? '<p class="lead" style="margin-top:18px">Le programme n\'a pas pu être préparé. Vérifie ta connexion.</p>' : '<div class="typing" style="margin-top:22px"><i></i><i></i><i></i></div>'}
       <p class="lead" style="margin:18px 0 0">Combien de temps par jour ?</p>
       <div class="mins">${[5, 10, 15, 20].map(m => `<button data-min="${m}" class="${p.minutes === m ? 'sel' : ''}">${m} min</button>`).join('')}</div>`;
-    foot.innerHTML = `<button class="btn" id="obTrial">Faire mon premier appel (2 min)</button><button class="btn ghost" id="obLater">Plus tard</button>`;
+    foot.innerHTML = ob.failed ? `<button class="btn" id="obRetry">Réessayer</button><button class="btn ghost" id="obLater">Plus tard</button>`
+      : `<button class="btn" id="obTrial" ${pl ? '' : 'disabled'}>Faire mon premier appel (2 min)</button><button class="btn ghost" id="obLater">Plus tard</button>`;
   }
 }
 function obFinish(trial) {
-  const p = S.profile; p.done = true; p.step = 0;
-  S.start = OB().startDay[p.level || 0]; save(); ob = null;
-  if (trial) { openLesson(currentDay(), true); $('#startBtn')?.remove(); begin(); } else { show('home'); toast('Ton programme est prêt'); }
+  const p = S.profile; p.done = true; p.step = 0; save(); ob = null;
+  if (trial && PLAN()) openAt(0, 0, true).then(() => { $('#startBtn')?.remove(); begin(); });
+  else { show('home'); if (PLAN()) toast('Ton programme est prêt'); }
 }
-$('#obBack').addEventListener('click', () => { if (!ob) return; if (ob.picking) { ob.picking = false; return renderOnb(); } if (STEPS[ob.i] === 'words' && ob.stage === 'b') { ob.stage = 'a'; return renderOnb(); } obGo(-1); });
+$('#obBack').addEventListener('click', () => { if (!ob) return; if (ob.picking) { ob.picking = false; return renderOnb(); } obGo(-1); });
 $('#obSkip').addEventListener('click', () => { if (!ob) return; if (S.profile.done !== true) S.profile.done = 'skipped'; save(); ob = null; show('home'); });
 $('#onb').addEventListener('input', e => { if (e.target.id === 'obName') { S.profile.name = e.target.value.trim(); const b = $('#obNext'); if (b) b.disabled = !(S.profile.name && S.profile.gender); } });
-$('#onb').addEventListener('change', e => { if (e.target.id === 'obAll') { const list = OB().words[ob.stage]; for (const w of list) e.target.checked ? ob.known.add(w) : ob.known.delete(w); renderOnb(); } });
 $('#onb').addEventListener('click', e => {
   if (!ob) return;
   const p = S.profile, o = OB(), step = STEPS[ob.i];
@@ -1635,9 +1708,9 @@ $('#onb').addEventListener('click', e => {
   if (pl) { e.stopPropagation(); const a = window.AVATARS.find(x => x.id === pl.dataset.play); unlockAudio(); stopSpeaking(); player.src = a.sample; return void player.play().catch(() => {}); }
   const pk = e.target.closest('[data-pick]'); if (pk) { S.set.avatar = pk.dataset.pick; save(); return renderOnb(); }
   const it = e.target.closest('[data-int]'); if (it) { const a = new Set(p.interests || []); a.has(it.dataset.int) ? a.delete(it.dataset.int) : a.add(it.dataset.int); p.interests = [...a]; save(); return renderOnb(); }
-  const w = e.target.closest('[data-w]'); if (w) { ob.known.has(w.dataset.w) ? ob.known.delete(w.dataset.w) : ob.known.add(w.dataset.w); return renderOnb(); }
   const mn = e.target.closest('[data-min]'); if (mn) { p.minutes = +mn.dataset.min; save(); return renderOnb(); }
   if (e.target.closest('#obOther')) { ob.picking = true; return renderOnb(); }
+  if (e.target.closest('#obRetry')) { ob.failed = false; return renderOnb(); }
   if (e.target.closest('#obTrial')) return obFinish(true);
   if (e.target.closest('#obLater')) return obFinish(false);
   const opt = e.target.closest('[data-o]');
@@ -1645,7 +1718,10 @@ $('#onb').addEventListener('click', e => {
     const v = opt.dataset.o;
     if (step === 'name') { p.gender = v; save(); return renderOnb(); }
     if (step === 'places' || step === 'skills') { const k = step, a = new Set(p[k] || []); a.has(v) ? a.delete(v) : a.add(v); p[k] = [...a]; save(); return renderOnb(); }
-    if (step === 'goal') { if (p.goal !== v) p.places = []; p.goal = v; }
+    if (step === 'native') { S.native = v; ob.nat = true; if (S.target === v) S.target = v === 'nl' ? 'fr' : 'nl'; }
+    else if (step === 'target') { S.target = v; ob.tgt = true; }
+    else if (step === 'level') { if (p.level !== +v && PLAN() && PLAN().level !== LEVELS[+v]) delete S.plans[S.target]; p.level = +v; }
+    else if (step === 'goal') { if (p.goal !== v) p.places = []; p.goal = v; }
     else if (step === 'variant') p.variant = v;
     else if (step === 'correct') p.correct = v;
     else if (step === 'style') { p.style = v; const a = window.AVATARS.find(x => x.style === v); if (a) S.set.avatar = a.id; }
@@ -1654,16 +1730,13 @@ $('#onb').addEventListener('click', e => {
   }
   if (e.target.closest('#obNext')) {
     if (step === 'name' && !(p.name && p.gender)) return;
-    if (step === 'words') {
-      const a = o.words.a, ka = [...ob.known].filter(x => a.includes(x)).length;
-      if (ob.stage === 'a' && ka >= 18) { ob.stage = 'b'; renderOnb(); return void ($('#obBody').scrollTop = 0); }
-      obLevel();
-    }
     obGo(1);
   }
 });
 
 /* ---------- boot ---------- */
+if (!LANGS[S.native]) S.native = 'fr'; if (!LANGS[S.target] || S.target === S.native) S.target = S.native === 'nl' ? 'fr' : 'nl';
+S.plans = S.plans || {}; delete S.done; delete S.start; delete S.pair;
 if (!S.profile || !S.profile.done) startOnb(); else renderHome();
 // arriving from the "forgot password" email: the link carries a short session, used to set the new password
 { const h = new URLSearchParams(location.hash.slice(1));

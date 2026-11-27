@@ -22,7 +22,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (!process.env.ANTHROPIC_API_KEY) return res.status(503).json({ error: 'no_key' });
   const b = req.body || {};
-  const target = clip(b.targetName || 'néerlandais', 40), native = clip(b.nativeName || 'français', 40);
+  const target = clip(b.targetName || 'Dutch', 40), native = clip(b.nativeName || 'French', 40);
   const client = new Anthropic();
   try {
     if (b.translate) {
@@ -41,9 +41,9 @@ export default async function handler(req, res) {
     const r = await client.beta.messages.create({
       model: MODEL, max_tokens: 4000,
       betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default',
-      system: `You review a spoken ${target} lesson for a ${native} speaker, day ${parseInt(b.day, 10) || 1} of a 90 day program (${clip(b.level, 20)}). Lesson: ${clip(b.title, 80)}.
+      system: `You review a spoken ${target} lesson for a ${native} speaker at level ${clip(b.level, 20) || 'A1'} (European scale). Lesson: ${clip(b.title, 80)}.
 The learner lines come from speech recognition and may contain transcription slips: only report mistakes that are clearly the learner's, and judge them against what a learner at this stage can know.
-Write everything for the learner in ${native}, warm and specific, addressing them as "tu". Fields:
+Write everything for the learner in ${native}, warm and specific, addressing them informally (as "tu" in French, "du" in German, "tú" in Spanish, and so on). Fields:
 - summary: two sentences on how the call went.
 - takeaways: exactly three short points to remember from this call (a phrase with its meaning, a rule, or a habit to keep), one sentence each.
 - strengths: two or three concrete things they did well, quoting their own words when possible.

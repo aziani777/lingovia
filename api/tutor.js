@@ -41,7 +41,7 @@ function systemPrompt(c) {
 TARGET language (the one being learned): ${c.targetName}.
 NATIVE language (the learner's own): ${c.nativeName}.
 
-The learner follows a 90 day program that goes from zero to conversational fluency. Today is day ${c.day} of 90, level ${c.level}.
+The learner follows a personal plan made of themes and lessons. Their level is ${c.level} (European scale, A0 is a complete beginner).
 Lesson: ${c.title}. Focus: ${c.focus}. Situation to play out: ${c.scenario}
 Key phrases for today:
 ${phrases}

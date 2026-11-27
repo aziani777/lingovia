@@ -20,12 +20,12 @@ def call(method, path, body=None):
 def s(desc, enum=None): return {'type': 'string', 'description': desc, **({'enum': enum} if enum else {})}
 REACTIONS = ['smile', 'laugh', 'surprised', 'thinking', 'wink', 'nod', 'shake_head', 'wave', 'thumbs_up', 'ok', 'shrug', 'proud', 'oops']
 TOOLS = [
-    ('show_phrase', 'Show a Dutch phrase and its French meaning on the learner\'s screen. Call it whenever you teach or use a Dutch phrase worth remembering.',
-     {'dutch': s('The Dutch phrase, exactly as said.'), 'french': s('Its French meaning.')}),
-    ('show_correction', 'Show a correction card on the learner\'s screen after they make a real mistake in Dutch.',
-     {'said': s('What the learner said.'), 'correct': s('The correct Dutch sentence.'), 'why': s('One short sentence in French explaining the mistake.')}),
+    ('show_phrase', 'Show a phrase in the language being learned and its meaning in the learner\'s own language on their screen. Call it whenever you teach or use a phrase worth remembering.',
+     {'dutch': s('The phrase in the language being learned, exactly as said.'), 'french': s('Its meaning in the learner\'s own language.')}),
+    ('show_correction', 'Show a correction card on the learner\'s screen after they make a real mistake in the language they are learning.',
+     {'said': s('What the learner said.'), 'correct': s('The correct sentence in the language being learned.'), 'why': s('One short sentence in the learner\'s own language explaining the mistake.')}),
     ('lesson_done', 'Mark today\'s lesson as completed. Call once, when the learner has managed the key phrases and the scene has been played.',
-     {'praise': s('One short sentence in French about what the learner did well.')}),
+     {'praise': s('One short sentence in the learner\'s own language about what the learner did well.')}),
     ('react', 'Make your on-screen body react: a facial expression or a hand gesture. Call it often, the way a person reacts while talking.',
      {'reaction': s('The reaction to show.', REACTIONS)}),
 ]
@@ -40,6 +40,7 @@ for name, desc, props in TOOLS:
 
 DV = {'day': '1', 'level': 'A0', 'lesson_title': 'Dire bonjour', 'focus': 'Les salutations', 'scenario': 'Première rencontre.',
       'phrases': '- Hallo! = Salut !', 'balance': 'Mostly French, with short Dutch phrases.', 'greeting': 'Hallo! Moi c\'est Sanne. Tu es prêt ?',
+      'target_language': 'Dutch', 'native_language': 'French',
       'tutor_name': 'Sanne', 'persona': '32, a Dutch teacher from Utrecht. Warm, patient and encouraging', 'learner': 'A French speaker, complete beginner.', 'recap': ''}
 agent = {
     'name': os.environ.get('LINGOVIA_AGENT_NAME', 'Lingovia - Sanne (nl-fr)'),
@@ -51,7 +52,9 @@ agent = {
                        'reasoning_effort': os.environ.get('LINGOVIA_AGENT_EFFORT', 'low'), 'enable_reasoning_summary': False},
         },
         'tts': {'model_id': TTS, 'voice_id': VOICE},
-        'asr': {'provider': 'scribe_realtime', 'keywords': ['hallo', 'goedemorgen', 'dank je wel', 'alsjeblieft', 'hoe gaat het', 'ik heet', 'tot ziens']},
+        'asr': {'provider': 'scribe_realtime', 'keywords': []},
+        # the learner's own language is set for each call; these are the ones a call may ask for
+        'language_presets': {code: {'overrides': {}} for code in ('en', 'de', 'es', 'it', 'nl')},
         # normal eagerness + speculative turn: answers about as fast as a person, without cutting off a learner who hesitates
         'turn': {'turn_timeout': 12, 'turn_eagerness': 'normal', 'speculative_turn': True, 'turn_model': 'turn_v3',
                  'spelling_patience': 'off', 'silence_end_call_timeout': 120},
@@ -59,7 +62,7 @@ agent = {
     },
 }
 # each call may pick the tutor's voice
-agent['platform_settings'] = {'overrides': {'conversation_config_override': {'tts': {'voice_id': True}}}}
+agent['platform_settings'] = {'overrides': {'conversation_config_override': {'tts': {'voice_id': True}, 'agent': {'language': True}}}}
 agent_id = sys.argv[1] if len(sys.argv) > 1 else None
 if agent_id: call('PATCH', f'/v1/convai/agents/{agent_id}', agent)
 else: agent_id = call('POST', '/v1/convai/agents/create', agent)['agent_id']

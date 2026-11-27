@@ -1,5 +1,5 @@
-const CACHE = 'lingovia-v31';
-const SHELL = ['/app', '/curriculum.js', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png',
+const CACHE = 'lingovia-v32';
+const SHELL = ['/app', '/langs.js', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png',
   '/assets/avatar.jpg', '/assets/idle.mp4', '/assets/base.jpg', '/assets/mouth.jpg', '/assets/blink.jpg'];
 
 self.addEventListener('install', e => {
